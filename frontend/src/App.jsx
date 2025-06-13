@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
+import SendMessage from './components/SendMessage';
 
 function App() {
   const [prices, setPrices] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://127.0.0.1:5000/api/test')
+    fetch('http://127.0.0.1:5000/test/test')
       .then(response => {
         if (!response.ok) {
           throw new Error(`HTTP error! status: ${response.status}`);
@@ -41,6 +42,7 @@ function App() {
       
     // </div>
       <div>
+        <SendMessage/>
         <h1>AAPL Price Data</h1>
         {loading ? (
           <p>Loading...</p>

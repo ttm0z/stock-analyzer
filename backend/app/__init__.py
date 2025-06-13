@@ -1,19 +1,34 @@
+import os
 from flask import Flask
 from flask_cors import CORS
 from .db import db
 
+from .routes.stock_routes import stock_bp
+from .routes.test_routes import test_bp
+
 def create_app():
     app = Flask(__name__)
-    app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///database.db'
+
+    # Use environment variable or fallback to a local PostgreSQL URI
+    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
+        'DATABASE_URL', 
+        'postgresql://stockanalyzer:stockanalyzer@localhost:5432/stockdb'
+    )
     app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
     db.init_app(app)
-    CORS(app, resources={r"/api/*": {"origins": "http://localhost:5173"}})
+    
+    # Enable CORS for your React frontend (adjust origin as needed)
+    CORS(app)
 
-    from .routes import api_bp
-    app.register_blueprint(api_bp)
+    # Import and register your API blueprint
+    
+    app.register_blueprint(test_bp, url_prefix='/test')
+    app.register_blueprint(stock_bp, url_prefix='/api')
 
     with app.app_context():
+        # Create tables if they don't exist
         db.create_all()
 
     return app
+
