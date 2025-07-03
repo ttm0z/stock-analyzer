@@ -6,7 +6,7 @@ import pandas as pd
 from flask import Blueprint, request, jsonify
 from ..db import db
 from ..models import TestMessage
-from app.services.stock_service import fetch_stock_data, fetch_search_query
+from app.services.stock_service import fetch_stock_data, fetch_search_query, fetch_historical_data
 
 
 stock_bp = Blueprint('api', __name__)
@@ -19,6 +19,16 @@ def get_stock(symbol):
         return jsonify(data)
     else:
         return jsonify({'error': 'Failed to fetch stock data'}), 500
+
+@stock_bp.route('stock-data/<symbol>', methods=['GET'])
+def get_stock_data(symbol):
+    data = fetch_historical_data(symbol)
+    if data:
+        return jsonify(data)
+    else:
+        return jsonify({'error': 'Failed to fetch historizal data'}), 500
+
+
 
 @stock_bp.route('search/<symbol>', methods=['GET'])
 def get_search_result(symbol):

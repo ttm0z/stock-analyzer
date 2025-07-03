@@ -1,6 +1,7 @@
 import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import './StockDetail.css';
+import StockLineChart from './StockLineChart.jsx';
 
 function StockDetail() {
   const { symbol } = useParams();
@@ -65,7 +66,7 @@ function StockDetail() {
         <div className='stock-head'>
             <h1 className="stock-title">{stockData['name']}</h1>
             <b>{symbol}<br/>{stockData['exchange']}</b>
-            <p><strong>Price:</strong> {stockData['price']}</p>
+            <p><strong>Price: $</strong>{stockData['price']}</p>
         </div>
         )
     }
@@ -76,7 +77,7 @@ function StockDetail() {
 
       {stockData && (
         <div className="stock-info-card">
-          
+          <StockLineChart symbol={symbol}/>
         </div>
       )}
     </div>
