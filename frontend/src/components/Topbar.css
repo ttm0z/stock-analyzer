@@ -1,0 +1,32 @@
+.topbar {
+    height: 60px;
+    background-color: #f3f4f6;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0 1rem;
+    border-bottom: 1px solid #e5e7eb;
+  }
+  
+  .topbar-left h1 {
+    font-size: 1.5rem;
+    color: #111827;
+  }
+  
+  .topbar-right {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+  }
+  
+  .topbar-right input {
+    padding: 0.5rem;
+    border: 1px solid #d1d5db;
+    border-radius: 4px;
+  }
+  
+  .profile-icon {
+    font-size: 1.5rem;
+    cursor: pointer;
+  }
+  
