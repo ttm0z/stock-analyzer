@@ -5,7 +5,6 @@ import './StockDetail.css';
 function StockDetail() {
   const { symbol } = useParams();
   const [stockData, setStockData] = useState(null);
-  const [metaData, setMetaData] = useState(null);
   const [error, setError] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -15,13 +14,12 @@ function StockDetail() {
       try {
         const res = await fetch(`http://localhost:5000/api/stock/${symbol}`);
         const data = await res.json();
-
+        console.log(data);  // Good for debugging
         if (res.ok) {
-          setStockData(data);
-          setMetaData(data['Meta Data']);
+          setStockData(data[0]);  // Grab first object from the array
           setError(null);
         } else {
-          setError(data.error || 'Failed to fetch stock data');
+          setError('No data found');
           setStockData(null);
         }
       } catch (err) {
@@ -32,23 +30,53 @@ function StockDetail() {
         setLoading(false);
       }
     };
-
+  
     fetchStock();
   }, [symbol]);
-
   
+
+//   Array [ {…} ]// ​
+// 0: Object { avgVolume: 330235.4, change: 0.03, changesPercentage: 0.72904, … }// ​​
+// avgVolume: 330235.4// ​​
+// change: 0.03// ​​
+// changesPercentage: 0.72904// ​​
+// dayHigh: 4.15// ​​
+// dayLow: 4.03// ​​
+// earningsAnnouncement: "2025-08-07T10:59:00.000+0000"// ​​
+// eps: -0.14// ​​
+// exchange: "NYSE"// ​​
+// marketCap: 181564264// ​​
+// name: "FutureFuel Corp."// ​​
+// open: 4.12// ​​
+// pe: -29.61// ​​
+// previousClose: 4.115// ​​
+// price: 4.145// ​​
+// priceAvg200: 4.8548// ​
+// priceAvg50: 4.034// ​​
+// sharesOutstanding: 43803200// ​​
+// symbol: "FF"
+// timestamp: 1751554031
+// volume: 29361
+// yearHigh: 6.4
+// yearLow: 3.77
   return (
     <div className="stock-detail-container">
-      <h1 className="stock-title">Stock Details: {symbol}</h1>
+      {stockData && (
+        <div className='stock-head'>
+            <h1 className="stock-title">{stockData['name']}</h1>
+            <b>{symbol}<br/>{stockData['exchange']}</b>
+            <p><strong>Price:</strong> {stockData['price']}</p>
+        </div>
+        )
+    }
 
       {loading && <div className="loading">Loading...</div>}
 
       {error && <div className="error-message">{error}</div>}
 
-      {metaData && (
+      {stockData && (
         <div className="stock-info-card">
-          <p><strong>Symbol:</strong> {metaData['2. Symbol'] || 'N/A'}</p>
-          <p><strong>Latest Close Price:</strong> ${metaData['4. close'] || 'N/A'}</p>
+          
         </div>
       )}
     </div>

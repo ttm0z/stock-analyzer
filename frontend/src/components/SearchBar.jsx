@@ -14,10 +14,9 @@ function SearchBar() {
     try {
       const res = await fetch(`http://localhost:5000/api/search/${query}`);
       const data = await res.json();
-      console.log(data)
 
-      if (res.ok && data.bestMatches) {
-        setResults(data.bestMatches);
+      if (res.ok && data) {
+        setResults(data);
         setError(null);
       } else {
         setResults([]);
@@ -61,9 +60,9 @@ function SearchBar() {
           {results.map((result, idx) => (
             <li
               key={idx}
-              onClick={() => handleResultClick(result['1. symbol'])}
+              onClick={() => handleResultClick(result['symbol'])}
             >
-              <strong>{result['1. symbol']}</strong> - {result['2. name']}
+              <strong>{result['symbol']}</strong> - {result['name']}
             </li>
           ))}
         </ul>
