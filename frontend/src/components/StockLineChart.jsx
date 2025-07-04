@@ -1,13 +1,14 @@
 import { useEffect, useState } from "react";
 import { LineChart, Line, XAxis, YAxis, Tooltip, CartesianGrid, ResponsiveContainer } from "recharts";
 import axios from "axios";
+import { useHistoricalData } from "../hooks/useStockAPI";
 
 
 function StockLineChart({ symbol }) {
-  const [data, setData] = useState([]);
+  const {data, loading, error} = useHistoricalData(symbol);
+  
   const [dateRange, setDateRange] = useState("30d")
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  
   const getFilteredData = () => {
     if (!data) return [];
   
@@ -57,34 +58,6 @@ function StockLineChart({ symbol }) {
     }
   };
   
-  useEffect(() => {
-    const fetchStockData = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`http://localhost:5000/api/stock-data/${symbol}`);
-        const data = await res.json();
-        console.log(data);  
-        if (res.ok) {
-            setData(data.historical.map(item => ({
-              date: item.date,
-              price: item.close
-            })).reverse());  // Grab first object from the array
-          setError(null);
-        } else {
-          setError('No data found');
-          setData(null);
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Network error');
-        setData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchStockData();
-  }, [symbol]);
 
   return (<>
     {loading && <div className="loading">Loading...</div>}

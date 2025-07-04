@@ -2,39 +2,37 @@ import { useParams } from 'react-router-dom';
 import { useEffect, useState } from 'react';
 import './StockDetail.css';
 import StockLineChart from './StockLineChart.jsx';
+import { useStockQuote } from '../hooks/useStockAPI.js';
 
 function StockDetail() {
   const { symbol } = useParams();
-  const [stockData, setStockData] = useState(null);
-  const [error, setError] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const { data, loading, error, refetch } = useStockQuote(symbol);
+  
+  
+  if (loading) return <p>Loading quote...</p>;
+  if (error) return <p>Error: {error}</p>;
+  if (!data) return <p>No data available</p>;
+  
+  return (
+    <div className="stock-detail-container">
+      {data && (
+        <div className='stock-head'>
+            <h1 className="stock-title">{data['name']}</h1>
+            <b>{symbol}<br/>{data['exchange']}</b>
+            <p><strong>Price: $</strong>{data['price']}</p>
+        </div>
+        )
+    }
+      {data && (
+        <div className="stock-info-card">
+          <StockLineChart symbol={symbol}/>
+        </div>
+      )}
+    </div>
+  );
+}
 
-  useEffect(() => {
-    const fetchStock = async () => {
-      setLoading(true);
-      try {
-        const res = await fetch(`http://localhost:5000/api/stock/${symbol}`);
-        const data = await res.json();
-        console.log(data);  // Good for debugging
-        if (res.ok) {
-          setStockData(data[0]);  // Grab first object from the array
-          setError(null);
-        } else {
-          setError('No data found');
-          setStockData(null);
-        }
-      } catch (err) {
-        console.error(err);
-        setError('Network error');
-        setStockData(null);
-      } finally {
-        setLoading(false);
-      }
-    };
-  
-    fetchStock();
-  }, [symbol]);
-  
+export default StockDetail;
 
 //   Array [ {…} ]// ​
 // 0: Object { avgVolume: 330235.4, change: 0.03, changesPercentage: 0.72904, … }// ​​
@@ -60,28 +58,3 @@ function StockDetail() {
 // volume: 29361
 // yearHigh: 6.4
 // yearLow: 3.77
-  return (
-    <div className="stock-detail-container">
-      {stockData && (
-        <div className='stock-head'>
-            <h1 className="stock-title">{stockData['name']}</h1>
-            <b>{symbol}<br/>{stockData['exchange']}</b>
-            <p><strong>Price: $</strong>{stockData['price']}</p>
-        </div>
-        )
-    }
-
-      {loading && <div className="loading">Loading...</div>}
-
-      {error && <div className="error-message">{error}</div>}
-
-      {stockData && (
-        <div className="stock-info-card">
-          <StockLineChart symbol={symbol}/>
-        </div>
-      )}
-    </div>
-  );
-}
-
-export default StockDetail;
