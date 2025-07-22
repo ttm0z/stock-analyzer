@@ -1,10 +1,10 @@
 from flask import Blueprint, request, jsonify
-from ..models import Trade, db
+from ..models.models import Trade, db
 import yfinance as yf
 import pandas as pd
 from flask import Blueprint, request, jsonify
 from ..db import db
-from ..models import TestMessage
+from ..models.models import TestMessage
 
 test_bp = Blueprint('test', __name__)
 

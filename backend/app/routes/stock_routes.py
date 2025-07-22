@@ -1,6 +1,6 @@
 # routes/stock_routes.py (Enhanced)
 from flask import Blueprint, request, jsonify, current_app
-from ..models import Trade, db
+from ..models.models import Trade, db
 import logging
 
 stock_bp = Blueprint('stock', __name__)
