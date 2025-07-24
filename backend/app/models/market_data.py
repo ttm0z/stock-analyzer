@@ -19,7 +19,7 @@ class Asset(BaseModel):
     industry = Column(String(100), nullable=True)
     market_cap = Column(Float, nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
-    metadata = Column(JSON, nullable=True)  # Additional asset information
+    
     
     # Index for efficient queries
     __table_args__ = (

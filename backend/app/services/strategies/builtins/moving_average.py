@@ -1,349 +1,226 @@
 """
-Base strategy class for implementing trading strategies.
+Moving Average Crossover Strategy
 """
-
-from abc import ABC, abstractmethod
-from typing import Dict, List, Optional, Tuple, Any
-from dataclasses import dataclass, field
-from datetime import datetime
 import pandas as pd
 import numpy as np
-import logging
+from typing import Dict, List, Optional
+from datetime import datetime
 
-logger = logging.getLogger(__name__)
+from ..base_strategy import BaseStrategy, StrategyContext, Signal
 
-@dataclass
-class Signal:
-    """Trading signal"""
-    symbol: str
-    signal_type: str  # BUY, SELL, HOLD
-    strength: float  # 0-1 confidence level
-    price: float
-    timestamp: datetime
-    quantity: Optional[float] = None
-    reason: str = ""
-    metadata: Dict = field(default_factory=dict)
-
-@dataclass
-class StrategyContext:
-    """Context passed to strategy methods"""
-    current_date: datetime
-    portfolio_value: float
-    cash_balance: float
-    positions: Dict[str, float]  # symbol -> quantity
-    market_data: Dict[str, pd.DataFrame]  # symbol -> OHLCV data
-    indicators: Dict[str, Any] = field(default_factory=dict)
-    metadata: Dict = field(default_factory=dict)
-
-class BaseStrategy(ABC):
-    """Abstract base class for trading strategies"""
+class MovingAverageStrategy(BaseStrategy):
+    """Simple Moving Average Crossover Strategy"""
     
-    def __init__(self, name: str, parameters: Dict = None):
-        self.name = name
-        self.parameters = parameters or {}
-        self.universe = []  # List of symbols to trade
-        self.is_initialized = False
-        self.lookback_period = 252  # Default 1 year
-        self.rebalance_frequency = 'daily'  # daily, weekly, monthly
-        self.position_sizer = None
-        self.risk_manager = None
+    def __init__(self, parameters: Dict = None):
+        default_params = {
+            'fast_period': 20,
+            'slow_period': 50,  
+            'min_volume': 100000,  # Minimum daily volume
+            'position_size': 0.1   # 10% of portfolio per position
+        }
         
-        # Strategy state
-        self.current_signals = {}
-        self.last_rebalance_date = None
-        self.strategy_state = {}
+        if parameters:
+            default_params.update(parameters)
         
-        # Performance tracking
-        self.total_signals = 0
-        self.signals_generated = []
+        super().__init__("Moving Average Crossover", default_params)
+        
+        self.fast_period = self.parameters['fast_period']
+        self.slow_period = self.parameters['slow_period'] 
+        self.min_volume = self.parameters['min_volume']
+        self.position_size = self.parameters['position_size']
         
         # Validation
-        self._validate_parameters()
-    
-    @abstractmethod
-    def initialize(self, universe: List[str], start_date: datetime, end_date: datetime):
-        """Initialize strategy with trading universe and date range"""
-        pass
-    
-    @abstractmethod
-    def generate_signals(self, context: StrategyContext) -> List[Signal]:
-        """Generate trading signals based on current market data"""
-        pass
-    
-    @abstractmethod
-    def get_required_data(self) -> Dict[str, List[str]]:
-        """Get required data for strategy (timeframes, indicators, etc.)"""
-        pass
-    
-    def should_rebalance(self, current_date: datetime) -> bool:
-        """Check if strategy should rebalance on current date"""
-        if not self.last_rebalance_date:
-            return True
+        if self.fast_period >= self.slow_period:
+            raise ValueError("Fast period must be less than slow period")
         
-        if self.rebalance_frequency == 'daily':
+        # Set lookback period to accommodate slow MA + buffer
+        self.lookback_period = self.slow_period + 50
+    
+    def initialize(self, context: StrategyContext) -> bool:
+        """Initialize strategy with market data"""
+        try:
+            # Verify we have sufficient data for all symbols
+            for symbol in self.universe:
+                if symbol not in context.market_data:
+                    self.logger.warning(f"No data available for {symbol}")
+                    continue
+                
+                data = context.market_data[symbol]
+                if len(data) < self.slow_period:
+                    self.logger.warning(f"Insufficient data for {symbol}: {len(data)} < {self.slow_period}")
+            
+            self.is_initialized = True
+            self.logger.info(f"Moving Average strategy initialized with {len(self.universe)} symbols")
             return True
-        elif self.rebalance_frequency == 'weekly':
-            return current_date.weekday() == 0  # Monday
-        elif self.rebalance_frequency == 'monthly':
-            return current_date.day == 1
-        else:
+            
+        except Exception as e:
+            self.logger.error(f"Strategy initialization failed: {e}")
             return False
     
-    def calculate_position_size(self, signal: Signal, context: StrategyContext) -> float:
-        """Calculate position size for a signal"""
-        if self.position_sizer:
-            return self.position_sizer.calculate_size(signal, context)
+    def generate_signals(self, context: StrategyContext) -> List[Signal]:
+        """Generate trading signals based on moving average crossover"""
+        signals = []
         
-        # Default: equal weight among all positions
-        max_positions = self.parameters.get('max_positions', 10)
-        target_weight = 1.0 / max_positions
-        target_value = context.portfolio_value * target_weight
+        if not self.is_initialized:
+            return signals
         
-        if signal.price > 0:
-            return target_value / signal.price
-        return 0
-    
-    def apply_risk_management(self, signals: List[Signal], context: StrategyContext) -> List[Signal]:
-        """Apply risk management rules to signals"""
-        if self.risk_manager:
-            return self.risk_manager.filter_signals(signals, context)
-        
-        # Basic risk management
-        filtered_signals = []
-        
-        for signal in signals:
-            # Basic position size limits
-            max_position_value = context.portfolio_value * 0.1  # 10% max per position
-            signal_value = signal.quantity * signal.price if signal.quantity else 0
+        try:
+            for symbol in self.universe:
+                signal = self._analyze_symbol(symbol, context)
+                if signal:
+                    signals.append(signal)
             
-            if signal_value <= max_position_value:
-                filtered_signals.append(signal)
-            else:
-                # Reduce position size
-                signal.quantity = max_position_value / signal.price
-                filtered_signals.append(signal)
+            return signals
+            
+        except Exception as e:
+            self.logger.error(f"Signal generation failed: {e}")
+            return []
+    
+    def _analyze_symbol(self, symbol: str, context: StrategyContext) -> Optional[Signal]:
+        """Analyze individual symbol for trading signals"""
         
-        return filtered_signals
+        if symbol not in context.market_data:
+            return None
+        
+        data = context.market_data[symbol]
+        
+        # Ensure we have enough data
+        if len(data) < self.slow_period:
+            return None
+        
+        # Calculate moving averages
+        data = data.copy()
+        data['fast_ma'] = data['close'].rolling(window=self.fast_period).mean()
+        data['slow_ma'] = data['close'].rolling(window=self.slow_period).mean()
+        
+        # Get current and previous values
+        current_idx = -1
+        prev_idx = -2
+        
+        if len(data) < abs(prev_idx):
+            return None
+        
+        current_fast = data['fast_ma'].iloc[current_idx]
+        current_slow = data['slow_ma'].iloc[current_idx]
+        prev_fast = data['fast_ma'].iloc[prev_idx]
+        prev_slow = data['slow_ma'].iloc[prev_idx]
+        
+        current_price = data['close'].iloc[current_idx]
+        current_volume = data['volume'].iloc[current_idx] if 'volume' in data.columns else 0
+        
+        # Skip if insufficient volume
+        if current_volume < self.min_volume:
+            return None
+        
+        # Check for crossover signals
+        signal_type = None
+        reason = ""
+        strength = 0.0
+        
+        # Bullish crossover: fast MA crosses above slow MA
+        if (prev_fast <= prev_slow and current_fast > current_slow):
+            signal_type = "BUY"
+            reason = f"Fast MA ({self.fast_period}) crossed above Slow MA ({self.slow_period})"
+            
+            # Calculate signal strength based on:
+            # 1. Distance between MAs
+            # 2. Slope of fast MA
+            # 3. Volume relative to average
+            ma_separation = abs(current_fast - current_slow) / current_slow
+            fast_ma_slope = (current_fast - prev_fast) / prev_fast
+            
+            strength = min(1.0, (ma_separation * 10) + (fast_ma_slope * 2))
+            strength = max(0.1, strength)  # Minimum 10% confidence
+        
+        # Bearish crossover: fast MA crosses below slow MA  
+        elif (prev_fast >= prev_slow and current_fast < current_slow):
+            signal_type = "SELL"
+            reason = f"Fast MA ({self.fast_period}) crossed below Slow MA ({self.slow_period})"
+            
+            ma_separation = abs(current_fast - current_slow) / current_slow
+            fast_ma_slope = abs(current_fast - prev_fast) / prev_fast
+            
+            strength = min(1.0, (ma_separation * 10) + (fast_ma_slope * 2))
+            strength = max(0.1, strength)
+        
+        # No signal
+        if not signal_type:
+            return None
+        
+        # Calculate position size
+        portfolio_allocation = self.position_size * strength
+        
+        return Signal(
+            symbol=symbol,
+            signal_type=signal_type,
+            strength=strength,
+            price=current_price,
+            timestamp=context.current_date,
+            quantity=portfolio_allocation,  # Portfolio percentage
+            reason=reason,
+            metadata={
+                'fast_ma': current_fast,
+                'slow_ma': current_slow,
+                'fast_period': self.fast_period,
+                'slow_period': self.slow_period,
+                'volume': current_volume,
+                'ma_separation': abs(current_fast - current_slow) / current_slow
+            }
+        )
     
-    def get_parameter(self, name: str, default=None):
-        """Get strategy parameter with default"""
-        return self.parameters.get(name, default)
+    def should_rebalance(self, context: StrategyContext) -> bool:
+        """Determine if portfolio should be rebalanced"""
+        # For MA crossover, we rebalance on every signal
+        return True
     
-    def set_parameter(self, name: str, value):
-        """Set strategy parameter"""
-        self.parameters[name] = value
-        self._validate_parameters()
+    def get_required_data_fields(self) -> List[str]:
+        """Return list of required data fields"""
+        return ['open', 'high', 'low', 'close', 'volume']
     
-    def get_strategy_state(self) -> Dict:
-        """Get current strategy state for persistence"""
+    def get_lookback_period(self) -> int:
+        """Return required lookback period in days"""
+        return self.lookback_period
+    
+    def validate_parameters(self) -> bool:
+        """Validate strategy parameters"""
+        required_params = ['fast_period', 'slow_period', 'position_size']
+        
+        for param in required_params:
+            if param not in self.parameters:
+                self.logger.error(f"Missing required parameter: {param}")
+                return False
+        
+        if self.parameters['fast_period'] >= self.parameters['slow_period']:
+            self.logger.error("Fast period must be less than slow period")
+            return False
+        
+        if not (0 < self.parameters['position_size'] <= 1):
+            self.logger.error("Position size must be between 0 and 1")
+            return False
+        
+        return True
+    
+    def get_strategy_info(self) -> Dict:
+        """Return strategy information"""
         return {
             'name': self.name,
+            'description': 'Simple Moving Average Crossover Strategy',
             'parameters': self.parameters,
-            'universe': self.universe,
-            'is_initialized': self.is_initialized,
+            'universe_size': len(self.universe),
             'lookback_period': self.lookback_period,
             'rebalance_frequency': self.rebalance_frequency,
-            'current_signals': self.current_signals,
-            'last_rebalance_date': self.last_rebalance_date,
-            'strategy_state': self.strategy_state,
-            'total_signals': self.total_signals
+            'strategy_type': 'Trend Following',
+            'risk_level': 'Medium',
+            'typical_holding_period': '1-3 months'
         }
-    
-    def set_strategy_state(self, state: Dict):
-        """Restore strategy state from persistence"""
-        self.name = state.get('name', self.name)
-        self.parameters = state.get('parameters', {})
-        self.universe = state.get('universe', [])
-        self.is_initialized = state.get('is_initialized', False)
-        self.lookback_period = state.get('lookback_period', 252)
-        self.rebalance_frequency = state.get('rebalance_frequency', 'daily')
-        self.current_signals = state.get('current_signals', {})
-        self.last_rebalance_date = state.get('last_rebalance_date')
-        self.strategy_state = state.get('strategy_state', {})
-        self.total_signals = state.get('total_signals', 0)
-    
-    def _validate_parameters(self):
-        """Validate strategy parameters"""
-        # Override in subclasses for specific validation
-        pass
-    
-    def calculate_technical_indicators(self, data: pd.DataFrame) -> Dict[str, pd.Series]:
-        """Calculate common technical indicators"""
-        indicators = {}
-        
-        try:
-            # Simple Moving Averages
-            for period in [10, 20, 50, 200]:
-                indicators[f'sma_{period}'] = data['close'].rolling(period).mean()
-            
-            # Exponential Moving Averages
-            for period in [12, 26]:
-                indicators[f'ema_{period}'] = data['close'].ewm(span=period).mean()
-            
-            # RSI
-            indicators['rsi'] = self._calculate_rsi(data['close'])
-            
-            # MACD
-            macd_line, signal_line, histogram = self._calculate_macd(data['close'])
-            indicators['macd'] = macd_line
-            indicators['macd_signal'] = signal_line
-            indicators['macd_histogram'] = histogram
-            
-            # Bollinger Bands
-            bb_upper, bb_middle, bb_lower = self._calculate_bollinger_bands(data['close'])
-            indicators['bb_upper'] = bb_upper
-            indicators['bb_middle'] = bb_middle
-            indicators['bb_lower'] = bb_lower
-            
-            # Volume indicators
-            indicators['volume_sma'] = data['volume'].rolling(20).mean()
-            
-        except Exception as e:
-            logger.error(f"Error calculating technical indicators: {str(e)}")
-        
-        return indicators
-    
-    def _calculate_rsi(self, prices: pd.Series, period: int = 14) -> pd.Series:
-        """Calculate Relative Strength Index"""
-        delta = prices.diff()
-        gain = delta.where(delta > 0, 0)
-        loss = -delta.where(delta < 0, 0)
-        
-        avg_gain = gain.rolling(period).mean()
-        avg_loss = loss.rolling(period).mean()
-        
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        
-        return rsi
-    
-    def _calculate_macd(self, prices: pd.Series, fast: int = 12, slow: int = 26, signal: int = 9) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate MACD"""
-        ema_fast = prices.ewm(span=fast).mean()
-        ema_slow = prices.ewm(span=slow).mean()
-        
-        macd_line = ema_fast - ema_slow
-        signal_line = macd_line.ewm(span=signal).mean()
-        histogram = macd_line - signal_line
-        
-        return macd_line, signal_line, histogram
-    
-    def _calculate_bollinger_bands(self, prices: pd.Series, period: int = 20, std_dev: int = 2) -> Tuple[pd.Series, pd.Series, pd.Series]:
-        """Calculate Bollinger Bands"""
-        middle = prices.rolling(period).mean()
-        std = prices.rolling(period).std()
-        
-        upper = middle + (std * std_dev)
-        lower = middle - (std * std_dev)
-        
-        return upper, middle, lower
-    
-    def log_signal(self, signal: Signal):
-        """Log generated signal"""
-        self.total_signals += 1
-        self.signals_generated.append(signal)
-        self.current_signals[signal.symbol] = signal
-        
-        logger.info(f"Strategy {self.name} generated {signal.signal_type} signal for {signal.symbol} "
-                   f"at {signal.price} with strength {signal.strength}")
 
-class PositionSizer(ABC):
-    """Abstract base class for position sizing"""
-    
-    @abstractmethod
-    def calculate_size(self, signal: Signal, context: StrategyContext) -> float:
-        """Calculate position size for a signal"""
-        pass
-
-class EqualWeightSizer(PositionSizer):
-    """Equal weight position sizer"""
-    
-    def __init__(self, max_positions: int = 10):
-        self.max_positions = max_positions
-    
-    def calculate_size(self, signal: Signal, context: StrategyContext) -> float:
-        """Calculate equal weight position size"""
-        target_weight = 1.0 / self.max_positions
-        target_value = context.portfolio_value * target_weight
-        
-        if signal.price > 0:
-            return target_value / signal.price
-        return 0
-
-class VolatilityTargetSizer(PositionSizer):
-    """Position sizer based on volatility targeting"""
-    
-    def __init__(self, target_volatility: float = 0.15, lookback: int = 20):
-        self.target_volatility = target_volatility
-        self.lookback = lookback
-    
-    def calculate_size(self, signal: Signal, context: StrategyContext) -> float:
-        """Calculate volatility-adjusted position size"""
-        try:
-            # Get historical data for the symbol
-            symbol_data = context.market_data.get(signal.symbol)
-            if symbol_data is None or len(symbol_data) < self.lookback:
-                return 0
-            
-            # Calculate historical volatility
-            returns = symbol_data['close'].pct_change().dropna()
-            if len(returns) < self.lookback:
-                return 0
-            
-            hist_vol = returns.tail(self.lookback).std() * np.sqrt(252)  # Annualized
-            
-            if hist_vol > 0:
-                vol_adjustment = self.target_volatility / hist_vol
-                base_weight = 0.1  # 10% base allocation
-                adjusted_weight = base_weight * vol_adjustment
-                
-                # Cap at 20% of portfolio
-                adjusted_weight = min(adjusted_weight, 0.2)
-                
-                target_value = context.portfolio_value * adjusted_weight
-                return target_value / signal.price
-            
-            return 0
-            
-        except Exception as e:
-            logger.error(f"Error in volatility targeting: {str(e)}")
-            return 0
-
-class RiskManager(ABC):
-    """Abstract base class for risk management"""
-    
-    @abstractmethod
-    def filter_signals(self, signals: List[Signal], context: StrategyContext) -> List[Signal]:
-        """Filter signals based on risk rules"""
-        pass
-
-class BasicRiskManager(RiskManager):
-    """Basic risk management implementation"""
-    
-    def __init__(self, max_position_weight: float = 0.1, max_portfolio_risk: float = 0.02):
-        self.max_position_weight = max_position_weight
-        self.max_portfolio_risk = max_portfolio_risk
-    
-    def filter_signals(self, signals: List[Signal], context: StrategyContext) -> List[Signal]:
-        """Apply basic risk filters"""
-        filtered_signals = []
-        
-        for signal in signals:
-            # Position size limit
-            if signal.quantity:
-                position_value = signal.quantity * signal.price
-                position_weight = position_value / context.portfolio_value
-                
-                if position_weight > self.max_position_weight:
-                    # Reduce position size
-                    signal.quantity = (context.portfolio_value * self.max_position_weight) / signal.price
-            
-            # Don't trade if already have large position
-            current_position = context.positions.get(signal.symbol, 0)
-            current_value = abs(current_position * signal.price)
-            current_weight = current_value / context.portfolio_value
-            
-            if current_weight < self.max_position_weight:
-                filtered_signals.append(signal)
-        
-        return filtered_signals
+# Factory function for easy instantiation
+def create_moving_average_strategy(fast_period: int = 20, slow_period: int = 50, 
+                                 position_size: float = 0.1) -> MovingAverageStrategy:
+    """Factory function to create Moving Average strategy with custom parameters"""
+    parameters = {
+        'fast_period': fast_period,
+        'slow_period': slow_period,
+        'position_size': position_size
+    }
+    return MovingAverageStrategy(parameters)

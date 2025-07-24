@@ -207,5 +207,112 @@ class DataProviderRegistry:
                 return provider_name
         return self.default_provider
 
+# Concrete implementation using StockService
+class StockServiceDataProvider(DataProvider):
+    """Data provider implementation using our existing StockService"""
+    
+    def __init__(self, stock_service):
+        super().__init__("stock_service")
+        self.stock_service = stock_service
+    
+    def get_historical_data(self, request: DataRequest) -> DataResponse:
+        """Get historical data using StockService"""
+        import pandas as pd
+        
+        all_data = []
+        missing_symbols = []
+        errors = []
+        
+        for symbol in request.symbols:
+            try:
+                # Use StockService to fetch historical data
+                start_str = request.start_date.strftime('%Y-%m-%d')
+                end_str = request.end_date.strftime('%Y-%m-%d')
+                
+                data = self.stock_service.fetch_historical_data(symbol, start_str, end_str)
+                
+                if 'historical' in data and data['historical']:
+                    # Convert to DataFrame
+                    df_data = []
+                    for record in data['historical']:
+                        df_data.append({
+                            'date': record['date'],
+                            'open': record['open'],
+                            'high': record['high'],
+                            'low': record['low'],
+                            'close': record['close'],
+                            'volume': record['volume'],
+                            'symbol': symbol
+                        })
+                    
+                    if df_data:
+                        df = pd.DataFrame(df_data)
+                        df['date'] = pd.to_datetime(df['date'])
+                        df.set_index('date', inplace=True)
+                        df.sort_index(inplace=True)
+                        all_data.append(df)
+                    else:
+                        missing_symbols.append(symbol)
+                else:
+                    missing_symbols.append(symbol)
+                    
+            except Exception as e:
+                errors.append(f"Error fetching data for {symbol}: {str(e)}")
+                missing_symbols.append(symbol)
+        
+        # Combine all data
+        if all_data:
+            combined_df = pd.concat(all_data)
+        else:
+            combined_df = pd.DataFrame()
+        
+        return DataResponse(
+            data=combined_df,
+            symbols=request.symbols,
+            start_date=request.start_date,
+            end_date=request.end_date,
+            timeframe=request.timeframe,
+            source="stock_service",
+            missing_symbols=missing_symbols,
+            errors=errors
+        )
+    
+    def get_real_time_quote(self, symbols: List[str]) -> Dict[str, Dict]:
+        """Get real-time quotes"""
+        quotes = {}
+        for symbol in symbols:
+            try:
+                quote_data = self.stock_service.fetch_stock_data(symbol)
+                quotes[symbol] = quote_data
+            except:
+                pass
+        return quotes
+    
+    def search_symbols(self, query: str, limit: int = 10) -> List[Dict]:
+        """Search symbols"""
+        try:
+            return self.stock_service.fetch_search_query(query)[:limit]
+        except:
+            return []
+    
+    def get_asset_info(self, symbols: List[str]) -> Dict[str, Dict]:
+        """Get asset information"""
+        info = {}
+        for symbol in symbols:
+            try:
+                profile = self.stock_service.get_company_profile(symbol)
+                info[symbol] = profile
+            except:
+                pass
+        return info
+    
+    def get_supported_timeframes(self) -> List[str]:
+        """Get supported timeframes"""
+        return ['1d']  # FMP API primarily supports daily data
+    
+    def get_supported_asset_types(self) -> List[str]:
+        """Get supported asset types"""
+        return ['stock', 'etf']
+
 # Global registry instance
 data_provider_registry = DataProviderRegistry()

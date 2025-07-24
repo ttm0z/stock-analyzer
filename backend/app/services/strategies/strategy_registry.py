@@ -24,13 +24,14 @@ class StrategyRegistry:
         # Auto-register built-in strategies
         self._register_builtin_strategies()
     
-    def register_strategy(self, strategy_class: Type[BaseStrategy], 
+    def register_strategy(self, strategy_name: str, strategy_class: Type[BaseStrategy], 
                          category: str = "custom", 
                          metadata: Dict = None) -> bool:
         """
         Register a strategy class
         
         Args:
+            strategy_name: Name to register the strategy under
             strategy_class: Strategy class to register
             category: Strategy category (trend, mean_reversion, momentum, etc.)
             metadata: Additional strategy metadata
@@ -39,12 +40,15 @@ class StrategyRegistry:
             True if registration successful
         """
         try:
+            # Handle case where strategy_class might be a string (error condition)
+            if isinstance(strategy_class, str):
+                logger.error(f"Strategy class for {strategy_name} is a string, not a class: {strategy_class}")
+                return False
+                
             # Validate strategy class
             if not self._validate_strategy_class(strategy_class):
                 logger.error(f"Invalid strategy class: {strategy_class.__name__}")
                 return False
-            
-            strategy_name = strategy_class.__name__
             
             # Check if already registered
             if strategy_name in self.strategies:
@@ -262,17 +266,18 @@ class StrategyRegistry:
         try:
             # Import and register built-in strategies
             builtin_strategies = [
-                ('built_in.buy_hold', 'BuyHoldStrategy', 'trend'),
-                ('built_in.moving_average', 'MovingAverageCrossoverStrategy', 'trend'),
-                ('built_in.moving_average', 'MeanReversionStrategy', 'mean_reversion'),
-                ('built_in.momentum', 'MomentumStrategy', 'momentum'),
+                ('builtins.buy_hold', 'BuyHoldStrategy', 'trend'),
+                ('builtins.moving_average', 'MovingAverageStrategy', 'trend'),
+                ('builtins.momentum', 'MomentumStrategy', 'momentum'),
+                ('builtins.momentum', 'RelativeStrengthStrategy', 'momentum'),
+                ('builtins.momentum', 'MeanReversionMomentumStrategy', 'momentum'),
             ]
             
             for module_name, class_name, category in builtin_strategies:
                 try:
                     module = importlib.import_module(f'.{module_name}', package='app.services.strategies')
                     strategy_class = getattr(module, class_name)
-                    self.register_strategy(strategy_class, category)
+                    self.register_strategy(class_name, strategy_class, category)
                 except (ImportError, AttributeError) as e:
                     logger.warning(f"Could not import {class_name} from {module_name}: {str(e)}")
         

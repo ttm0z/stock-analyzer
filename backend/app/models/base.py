@@ -1,14 +1,18 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy import Column, Integer, DateTime, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.sql import func
 
 Base = declarative_base()
 
+def utc_now():
+    """Helper function to get current UTC datetime"""
+    return datetime.now(timezone.utc)
+
 class TimestampMixin:
     """Mixin for adding timestamp columns to models"""
-    created_at = Column(DateTime, default=datetime.astimezone.utc, nullable=False)
-    updated_at = Column(DateTime, default=datetime.astimezone.utc, onupdate=datetime.astimezone.utc, nullable=False)
+    created_at = Column(DateTime, default=utc_now, nullable=False)
+    updated_at = Column(DateTime, default=utc_now, onupdate=utc_now, nullable=False)
 
 class BaseModel(Base, TimestampMixin):
     """Base model class with common functionality"""
@@ -28,7 +32,7 @@ class BaseModel(Base, TimestampMixin):
         for key, value in kwargs.items():
             if hasattr(self, key):
                 setattr(self, key, value)
-        self.updated_at = datetime.astimezone.utc()
+        self.updated_at = utc_now()  # Remove the extra () you had
     
     def __repr__(self):
         return f"<{self.__class__.__name__}(id={self.id})>"

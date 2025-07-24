@@ -31,11 +31,13 @@ class CacheService:
                 'host': os.getenv('REDIS_HOST', 'localhost'),
                 'port': int(os.getenv('REDIS_PORT', 6379)),
                 'db': int(os.getenv('REDIS_DB', 0)),
+                'password': os.getenv('REDIS_PASSWORD'),  # Add password support
                 'decode_responses': False,
                 'socket_timeout': 5,
                 'socket_connect_timeout': 5,
                 'retry_on_timeout': True,
-                'max_connections': int(os.getenv('REDIS_MAX_CONNECTIONS', 50))
+                'max_connections': int(os.getenv('REDIS_MAX_CONNECTIONS', 50)),
+                'ssl_cert_reqs': None if os.getenv('REDIS_SSL', 'false').lower() == 'false' else 'required'
             }
             
             redis_client = redis.Redis(**redis_config)
