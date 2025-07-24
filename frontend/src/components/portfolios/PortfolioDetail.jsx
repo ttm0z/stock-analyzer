@@ -39,12 +39,9 @@ const PortfolioDetail = () => {
       setError(null);
       
       // Load portfolio details
-      const portfolioResponse = await PortfolioAPI.getPortfolio(id);
-      setPortfolio(portfolioResponse);
-      
-      // Load positions
-      const positionsResponse = await PortfolioAPI.getPortfolioPositions(id);
-      setPositions(positionsResponse.positions || []);
+      const portfolioResponse = await PortfolioAPI.getPortfolioDetails(id);
+      setPortfolio(portfolioResponse.portfolio);
+      setPositions(portfolioResponse.positions || []);
       
       // Load recent transactions
       const transactionsResponse = await TradingAPI.getPortfolioTransactions(id, { limit: 10 });

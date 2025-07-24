@@ -47,7 +47,7 @@ class PortfolioAPI {
       if (filters.is_active !== undefined) params.is_active = filters.is_active;
       if (filters.limit) params.limit = filters.limit;
       if (filters.offset) params.offset = filters.offset;
-
+      console.log("Fetching portfolios . . . ");
       const response = await httpClient.get('/portfolios', { params });
       return response.data;
     } catch (error) {

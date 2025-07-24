@@ -9,6 +9,8 @@ from .routes.portfolio_routes import portfolio_bp
 from .routes.strategy_routes import strategy_bp
 from .routes.backtest_routes import backtest_bp
 from .routes.trading_routes import trading_bp
+from .routes.settings_routes import settings_bp
+from .routes.market_routes import market_bp
 from .services.cache_service import CacheService
 from .services.stock_service import StockService
 
@@ -64,6 +66,8 @@ def create_app():
     app.register_blueprint(strategy_bp, url_prefix='/api')
     app.register_blueprint(backtest_bp, url_prefix='/api')
     app.register_blueprint(trading_bp, url_prefix='/api/trading')
+    app.register_blueprint(settings_bp, url_prefix='/api/settings')
+    app.register_blueprint(market_bp, url_prefix='/api/market')
     
     # Add admin routes for cache management
     from .routes.admin_routes import admin_bp

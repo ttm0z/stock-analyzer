@@ -4,48 +4,79 @@ from sqlalchemy.dialects.sqlite import JSON
 from datetime import datetime
 import json
 
+from ..db import db
 from .base import BaseModel
 
-class Portfolio(BaseModel):
+class Portfolio(db.Model):
     """Portfolio model for tracking portfolio state"""
     __tablename__ = 'portfolios'
     
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    backtest_id = Column(Integer, ForeignKey('backtests.id'), nullable=True)  # Null for live portfolios
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    backtest_id = db.Column(db.Integer, nullable=True)  # Will add FK when backtests table exists
     
-    name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    portfolio_type = Column(String(20), default='backtest', nullable=False)  # backtest, paper, live
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    portfolio_type = db.Column(db.String(20), default='backtest', nullable=False)  # backtest, paper, live
     
     # Portfolio configuration
-    initial_capital = Column(Float, nullable=False)
-    currency = Column(String(10), default='USD', nullable=False)
+    initial_capital = db.Column(db.Float, nullable=False)
+    currency = db.Column(db.String(10), default='USD', nullable=False)
     
     # Current state
-    current_capital = Column(Float, nullable=False)
-    cash_balance = Column(Float, nullable=False)
-    invested_value = Column(Float, default=0.0, nullable=False)
-    total_value = Column(Float, nullable=False)
+    current_capital = db.Column(db.Float, nullable=False)
+    cash_balance = db.Column(db.Float, nullable=False)
+    invested_value = db.Column(db.Float, default=0.0, nullable=False)
+    total_value = db.Column(db.Float, nullable=False)
     
     # Performance tracking
-    total_return = Column(Float, default=0.0, nullable=False)
-    unrealized_pnl = Column(Float, default=0.0, nullable=False)
-    realized_pnl = Column(Float, default=0.0, nullable=False)
+    total_return = db.Column(db.Float, default=0.0, nullable=False)
+    unrealized_pnl = db.Column(db.Float, default=0.0, nullable=False)
+    realized_pnl = db.Column(db.Float, default=0.0, nullable=False)
     
     # Risk metrics
-    max_drawdown = Column(Float, default=0.0, nullable=False)
-    volatility = Column(Float, nullable=True)
-    sharpe_ratio = Column(Float, nullable=True)
+    max_drawdown = db.Column(db.Float, default=0.0, nullable=False)
+    volatility = db.Column(db.Float, nullable=True)
+    sharpe_ratio = db.Column(db.Float, nullable=True)
     
     # Portfolio status
-    is_active = Column(Boolean, default=True, nullable=False)
-    last_updated = Column(DateTime, default=datetime.utcnow, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    last_updated = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Timestamp columns
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    user = relationship("User", back_populates="portfolios")
-    backtest = relationship("Backtest")
-    positions = relationship("Position", back_populates="portfolio", cascade="all, delete-orphan")
-    snapshots = relationship("PortfolioSnapshot", back_populates="portfolio", cascade="all, delete-orphan")
+    user = db.relationship("User", back_populates="portfolios")
+    positions = db.relationship("Position", back_populates="portfolio", cascade="all, delete-orphan")
+    
+    def to_dict(self):
+        """Convert model instance to dictionary"""
+        return {
+            'id': self.id,
+            'user_id': self.user_id,
+            'backtest_id': self.backtest_id,
+            'name': self.name,
+            'description': self.description,
+            'portfolio_type': self.portfolio_type,
+            'initial_capital': self.initial_capital,
+            'currency': self.currency,
+            'current_capital': self.current_capital,
+            'cash_balance': self.cash_balance,
+            'invested_value': self.invested_value,
+            'total_value': self.total_value,
+            'total_return': self.total_return,
+            'unrealized_pnl': self.unrealized_pnl,
+            'realized_pnl': self.realized_pnl,
+            'max_drawdown': self.max_drawdown,
+            'volatility': self.volatility,
+            'sharpe_ratio': self.sharpe_ratio,
+            'is_active': self.is_active,
+            'last_updated': self.last_updated.isoformat() if self.last_updated else None,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
     
     # Index for efficient queries
     __table_args__ = (
@@ -60,42 +91,72 @@ class Portfolio(BaseModel):
         self.total_value = self.cash_balance + position_value
         self.total_return = ((self.total_value - self.initial_capital) / self.initial_capital) * 100
 
-class Position(BaseModel):
+class Position(db.Model):
     """Position model for tracking individual asset positions"""
     __tablename__ = 'positions'
     
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    symbol = Column(String(20), nullable=False, index=True)
+    id = db.Column(db.Integer, primary_key=True)
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
     
     # Position details
-    side = Column(String(10), nullable=False)  # LONG, SHORT
-    quantity = Column(Float, nullable=False)
-    avg_entry_price = Column(Float, nullable=False)
-    current_price = Column(Float, nullable=False)
+    side = db.Column(db.String(10), nullable=False)  # LONG, SHORT
+    quantity = db.Column(db.Float, nullable=False)
+    avg_entry_price = db.Column(db.Float, nullable=False)
+    current_price = db.Column(db.Float, nullable=False)
     
     # Cost basis and market value
-    cost_basis = Column(Float, nullable=False)
-    market_value = Column(Float, nullable=False)
+    cost_basis = db.Column(db.Float, nullable=False)
+    market_value = db.Column(db.Float, nullable=False)
     
     # P&L tracking
-    unrealized_pnl = Column(Float, default=0.0, nullable=False)
-    unrealized_pnl_pct = Column(Float, default=0.0, nullable=False)
-    realized_pnl = Column(Float, default=0.0, nullable=False)
+    unrealized_pnl = db.Column(db.Float, default=0.0, nullable=False)
+    unrealized_pnl_pct = db.Column(db.Float, default=0.0, nullable=False)
+    realized_pnl = db.Column(db.Float, default=0.0, nullable=False)
     
     # Position metadata
-    first_entry_date = Column(DateTime, nullable=False)
-    last_update_date = Column(DateTime, default=datetime.utcnow, nullable=False)
-    is_open = Column(Boolean, default=True, nullable=False)
+    first_entry_date = db.Column(db.DateTime, nullable=False)
+    last_update_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    is_open = db.Column(db.Boolean, default=True, nullable=False)
     
     # Risk metrics
-    position_weight = Column(Float, nullable=False)  # % of portfolio
-    max_position_value = Column(Float, nullable=False)
-    max_adverse_excursion = Column(Float, default=0.0, nullable=False)
-    max_favorable_excursion = Column(Float, default=0.0, nullable=False)
+    position_weight = db.Column(db.Float, nullable=False)  # % of portfolio
+    max_position_value = db.Column(db.Float, nullable=False)
+    max_adverse_excursion = db.Column(db.Float, default=0.0, nullable=False)
+    max_favorable_excursion = db.Column(db.Float, default=0.0, nullable=False)
+    
+    # Timestamp columns
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    portfolio = relationship("Portfolio", back_populates="positions")
-    transactions = relationship("Transaction", back_populates="position", cascade="all, delete-orphan")
+    portfolio = db.relationship("Portfolio", back_populates="positions")
+    
+    def to_dict(self):
+        """Convert model instance to dictionary"""
+        return {
+            'id': self.id,
+            'portfolio_id': self.portfolio_id,
+            'symbol': self.symbol,
+            'side': self.side,
+            'quantity': self.quantity,
+            'avg_entry_price': self.avg_entry_price,
+            'current_price': self.current_price,
+            'cost_basis': self.cost_basis,
+            'market_value': self.market_value,
+            'unrealized_pnl': self.unrealized_pnl,
+            'unrealized_pnl_pct': self.unrealized_pnl_pct,
+            'realized_pnl': self.realized_pnl,
+            'first_entry_date': self.first_entry_date.isoformat() if self.first_entry_date else None,
+            'last_update_date': self.last_update_date.isoformat() if self.last_update_date else None,
+            'is_open': self.is_open,
+            'position_weight': self.position_weight,
+            'max_position_value': self.max_position_value,
+            'max_adverse_excursion': self.max_adverse_excursion,
+            'max_favorable_excursion': self.max_favorable_excursion,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
     
     # Index for efficient queries
     __table_args__ = (
@@ -124,40 +185,69 @@ class Position(BaseModel):
         
         self.last_update_date = datetime.utcnow()
 
-class Transaction(BaseModel):
+class Transaction(db.Model):
     """Transaction model for recording all portfolio transactions"""
     __tablename__ = 'transactions'
     
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    position_id = Column(Integer, ForeignKey('positions.id'), nullable=True)
-    symbol = Column(String(20), nullable=False, index=True)
+    id = db.Column(db.Integer, primary_key=True)
+    portfolio_id = db.Column(db.Integer, db.ForeignKey('portfolios.id'), nullable=False)
+    position_id = db.Column(db.Integer, db.ForeignKey('positions.id'), nullable=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
     
     # Transaction details
-    transaction_type = Column(String(20), nullable=False)  # BUY, SELL, DIVIDEND, SPLIT, etc.
-    quantity = Column(Float, nullable=False)
-    price = Column(Float, nullable=False)
-    total_value = Column(Float, nullable=False)
+    transaction_type = db.Column(db.String(20), nullable=False)  # BUY, SELL, DIVIDEND, SPLIT, etc.
+    quantity = db.Column(db.Float, nullable=False)
+    price = db.Column(db.Float, nullable=False)
+    total_value = db.Column(db.Float, nullable=False)
     
     # Costs and fees
-    commission = Column(Float, default=0.0, nullable=False)
-    fees = Column(Float, default=0.0, nullable=False)
-    slippage = Column(Float, default=0.0, nullable=False)
+    commission = db.Column(db.Float, default=0.0, nullable=False)
+    fees = db.Column(db.Float, default=0.0, nullable=False)
+    slippage = db.Column(db.Float, default=0.0, nullable=False)
     
     # Transaction metadata
-    transaction_date = Column(DateTime, nullable=False, index=True)
-    settlement_date = Column(DateTime, nullable=True)
-    order_id = Column(String(100), nullable=True)
-    execution_venue = Column(String(50), nullable=True)
+    transaction_date = db.Column(db.DateTime, nullable=False, index=True)
+    settlement_date = db.Column(db.DateTime, nullable=True)
+    order_id = db.Column(db.String(100), nullable=True)
+    execution_venue = db.Column(db.String(50), nullable=True)
     
     # Cash impact
-    cash_impact = Column(Float, nullable=False)  # Net cash flow
+    cash_impact = db.Column(db.Float, nullable=False)  # Net cash flow
     
     # Transaction status
-    status = Column(String(20), default='executed', nullable=False)  # pending, executed, cancelled
+    status = db.Column(db.String(20), default='executed', nullable=False)  # pending, executed, cancelled
+    
+    # Timestamp columns
+    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = db.Column(db.DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
     
     # Relationships
-    portfolio = relationship("Portfolio")
-    position = relationship("Position", back_populates="transactions")
+    portfolio = db.relationship("Portfolio")
+    position = db.relationship("Position")
+    
+    def to_dict(self):
+        """Convert model instance to dictionary"""
+        return {
+            'id': self.id,
+            'portfolio_id': self.portfolio_id,
+            'position_id': self.position_id,
+            'symbol': self.symbol,
+            'transaction_type': self.transaction_type,
+            'quantity': self.quantity,
+            'price': self.price,
+            'total_value': self.total_value,
+            'commission': self.commission,
+            'fees': self.fees,
+            'slippage': self.slippage,
+            'transaction_date': self.transaction_date.isoformat() if self.transaction_date else None,
+            'settlement_date': self.settlement_date.isoformat() if self.settlement_date else None,
+            'order_id': self.order_id,
+            'execution_venue': self.execution_venue,
+            'cash_impact': self.cash_impact,
+            'status': self.status,
+            'created_at': self.created_at.isoformat() if self.created_at else None,
+            'updated_at': self.updated_at.isoformat() if self.updated_at else None
+        }
     
     # Index for efficient queries
     __table_args__ = (

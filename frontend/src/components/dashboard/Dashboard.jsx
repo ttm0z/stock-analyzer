@@ -594,7 +594,7 @@ const Dashboard = () => {
             </button>
             
             <button 
-              onClick={() => navigate('/strategies/new')}
+              onClick={() => navigate('/strategies')}
               className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow duration-200 flex flex-col items-center"
             >
               <BarChart3 className="h-8 w-8 text-primary-600 mb-2" />
@@ -602,7 +602,7 @@ const Dashboard = () => {
             </button>
             
             <button 
-              onClick={() => navigate('/backtests/new')}
+              onClick={() => navigate('/backtests')}
               className="bg-white p-6 rounded-lg shadow hover:shadow-md transition-shadow duration-200 flex flex-col items-center"
             >
               <Activity className="h-8 w-8 text-primary-600 mb-2" />

@@ -29,6 +29,14 @@ class User(db.Model):
     first_name = db.Column(db.String(50), nullable=True)
     last_name = db.Column(db.String(50), nullable=True)
     
+    # Preferences and settings
+    preferences = db.Column(db.Text, nullable=True)
+    deactivated_at = db.Column(db.DateTime, nullable=True)
+    deactivation_reason = db.Column(db.Text, nullable=True)
+    
+    # Relationships
+    portfolios = db.relationship("Portfolio", back_populates="user", lazy='dynamic')
+    
     def __init__(self, email, username, password, first_name=None, last_name=None):
         self.email = email.lower().strip()
         self.username = username.strip()
@@ -47,6 +55,10 @@ class User(db.Model):
     def generate_jwt_token(self, expires_in=3600):
         """Generate JWT token for user"""
         try:
+            secret_key = os.getenv('JWT_SECRET_KEY')
+            if not secret_key:
+                raise ValueError("JWT_SECRET_KEY environment variable is not set")
+            
             payload = {
                 'user_id': self.id,
                 'username': self.username,
@@ -55,12 +67,21 @@ class User(db.Model):
                 'iat': datetime.utcnow()
             }
             
-            return jwt.encode(
+            token = jwt.encode(
                 payload,
-                os.getenv('JWT_SECRET_KEY'),
+                secret_key,
                 algorithm='HS256'
             )
+            
+            # JWT returns bytes in older versions, string in newer versions
+            if isinstance(token, bytes):
+                token = token.decode('utf-8')
+                
+            return token
         except Exception as e:
+            print(f"JWT token generation error: {e}")
+            import traceback
+            traceback.print_exc()
             return None
     
     @staticmethod

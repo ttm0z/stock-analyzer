@@ -60,8 +60,8 @@ def register():
         
         # Generate JWT token (8 hours for paper trading app)
         token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
-        
-        logger.info(f"New user registered: {email}")
+        print(f"Generated token for new user {email}: {token}")
+        logger.info(f"New user registered: {email}, token generated: {token is not None}")
         
         return jsonify({
             'message': 'User registered successfully',
@@ -110,8 +110,8 @@ def login():
         
         # Generate JWT token (8 hours for paper trading app)
         token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
-        
-        logger.info(f"User logged in: {user.email}")
+        print(f"Generated token for user {user.email}: {token}")
+        logger.info(f"User logged in: {user.email}, token generated: {token is not None}")
         
         return jsonify({
             'message': 'Login successful',

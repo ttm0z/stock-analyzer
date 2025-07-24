@@ -63,6 +63,7 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     const token = tokenStorage.getToken();
+    console.log("Stored token:", token);
     const storedUser = tokenStorage.getUser();
     
     if (token && storedUser) {
@@ -92,6 +93,13 @@ export const AuthProvider = ({ children }) => {
       
       // Store tokens securely
       const token = response.token || response.access_token;
+      console.log("Login response token:", token);
+      console.log("Full login response:", response);
+      
+      if (!token) {
+        throw new Error('No authentication token received from server');
+      }
+      
       // Backend JWT tokens expire after 8 hours (28800 seconds), so store for 480 minutes
       const tokenExpiration = response.expires_in ? response.expires_in / 60 : 480; // 8 hours in minutes
       
@@ -99,7 +107,10 @@ export const AuthProvider = ({ children }) => {
         console.log('🔐 About to store token:', token ? 'Token received' : 'No token received');
       }
       
-      AuthAPI.setToken(token, tokenExpiration);
+      const tokenStored = AuthAPI.setToken(token, tokenExpiration);
+      if (!tokenStored) {
+        throw new Error('Failed to store authentication token');
+      }
       
       if (response.refresh_token) {
         AuthAPI.setRefreshToken(response.refresh_token);
@@ -148,9 +159,18 @@ export const AuthProvider = ({ children }) => {
       
       // Store tokens securely
       const token = response.token || response.access_token;
+      
+      if (!token) {
+        throw new Error('No authentication token received from server');
+      }
+      
       // Backend JWT tokens expire after 8 hours (28800 seconds), so store for 480 minutes
       const tokenExpiration = response.expires_in ? response.expires_in / 60 : 480; // 8 hours in minutes
-      AuthAPI.setToken(token, tokenExpiration);
+      
+      const tokenStored = AuthAPI.setToken(token, tokenExpiration);
+      if (!tokenStored) {
+        throw new Error('Failed to store authentication token');
+      }
       
       if (response.refresh_token) {
         AuthAPI.setRefreshToken(response.refresh_token);

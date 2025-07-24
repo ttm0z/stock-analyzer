@@ -9,6 +9,14 @@ import SearchBar from './components/SearchBar';
 import Topbar from './components/Topbar';
 import Sidebar from './components/Sidebar';
 import StockDetail from './components/StockDetail';
+import Portfolios from './components/portfolios/Portfolios';
+import PortfolioDetail from './components/portfolios/PortfolioDetail';
+import Trades from './components/trades/Trades';
+import Strategies from './components/strategies/Strategies';
+import Backtests from './components/backtests/Backtests';
+import Research from './components/research/Research';
+import MarketOverview from './components/market/MarketOverview';
+import Settings from './components/settings/Settings';
 import './App.css'
 
 function AppLayout({ children }) {
@@ -67,7 +75,7 @@ function AppRoutes() {
       } />
       
       {/* Future routes */}
-      {/*
+      
       <Route path="/portfolios" element={
         <ProtectedRoute>
           <AppLayout>
@@ -115,7 +123,6 @@ function AppRoutes() {
           </AppLayout>
         </ProtectedRoute>
       } />
-      
       <Route path="/settings" element={
         <ProtectedRoute>
           <AppLayout>
@@ -123,7 +130,15 @@ function AppRoutes() {
           </AppLayout>
         </ProtectedRoute>
       } />
-      */}
+      
+      <Route path="/market" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <MarketOverview />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      
     </Routes>
   );
 }
