@@ -19,6 +19,7 @@ import PortfolioAPI from '../../services/portfolioAPI';
 import CreatePortfolioModal from './CreatePortfolioModal';
 import EditPortfolioModal from './EditPortfolioModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import { generatePortfolioUrl } from '../../utils/portfolioUtils';
 
 const Portfolios = () => {
   const { user, token } = useAuth();
@@ -141,8 +142,9 @@ const Portfolios = () => {
     return `${percentage >= 0 ? '+' : ''}${(percentage * 100).toFixed(2)}%`;
   };
 
-  const handleViewPortfolio = (portfolioId) => {
-    navigate(`/portfolios/${portfolioId}`);
+  const handleViewPortfolio = (portfolio) => {
+    const portfolioUrl = generatePortfolioUrl(user.username, portfolio.name);
+    navigate(portfolioUrl);
   };
 
   if (loading) {
@@ -305,7 +307,7 @@ const Portfolios = () => {
                         <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg z-10 border border-gray-200">
                           <div className="py-1">
                             <button
-                              onClick={() => handleViewPortfolio(portfolio.id)}
+                              onClick={() => handleViewPortfolio(portfolio)}
                               className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
                             >
                               <Eye className="h-4 w-4 mr-2" />
@@ -377,7 +379,7 @@ const Portfolios = () => {
                   
                   <div className="mt-6">
                     <button
-                      onClick={() => handleViewPortfolio(portfolio.id)}
+                      onClick={() => handleViewPortfolio(portfolio)}
                       className="w-full inline-flex justify-center items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
                     >
                       View Details

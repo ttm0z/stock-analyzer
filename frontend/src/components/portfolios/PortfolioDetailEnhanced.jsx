@@ -36,7 +36,7 @@ import {
   generatePortfolioUrl
 } from '../../utils/portfolioUtils';
 
-const PortfolioDetail = () => {
+const PortfolioDetailEnhanced = () => {
   const { username, portfolioSlug } = useParams();
   const { user, token } = useAuth();
   const navigate = useNavigate();
@@ -52,7 +52,6 @@ const PortfolioDetail = () => {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [showTradingPanel, setShowTradingPanel] = useState(false);
   const [actionMenuOpen, setActionMenuOpen] = useState(null);
-  const [notification, setNotification] = useState(null);
   
   // Trading State
   const [searchQuery, setSearchQuery] = useState('');
@@ -65,9 +64,6 @@ const PortfolioDetail = () => {
     limitPrice: ''
   });
   const [tradingLoading, setTradingLoading] = useState(false);
-  const [searchLoading, setSearchLoading] = useState(false);
-  const [searchTimeout, setSearchTimeout] = useState(null);
-  const [selectedSearchIndex, setSelectedSearchIndex] = useState(-1);
 
   useEffect(() => {
     if (user && token && username && portfolioSlug) {
@@ -80,15 +76,6 @@ const PortfolioDetail = () => {
       loadPortfolioData();
     }
   }, [user, token, username, portfolioSlug]);
-
-  // Cleanup search timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (searchTimeout) {
-        clearTimeout(searchTimeout);
-      }
-    };
-  }, [searchTimeout]);
 
   const loadPortfolioData = async () => {
     try {
@@ -134,46 +121,22 @@ const PortfolioDetail = () => {
   const handleStockSearch = async (query) => {
     if (!query.trim()) {
       setSearchResults([]);
-      setSearchLoading(false);
       return;
     }
     
     try {
-      setSearchLoading(true);
       const results = await StockAPI.searchStocks(query);
-      // Handle different possible response formats
-      const stockList = Array.isArray(results) ? results : (results.results || results.data || []);
-      setSearchResults(stockList.slice(0, 5)); // Limit to 5 results
+      setSearchResults(results.slice(0, 5)); // Limit to 5 results
     } catch (error) {
       console.error('Stock search error:', error);
       setSearchResults([]);
-      // Don't show error for search failures, just clear results
-    } finally {
-      setSearchLoading(false);
     }
   };
 
   const handleSelectStock = async (stock) => {
-    try {
-      // Get current quote for selected stock
-      const quote = await StockAPI.getStockQuote(stock.symbol);
-      const stockWithPrice = {
-        ...stock,
-        price: quote.price || quote.c || stock.price,
-        change: quote.change || quote.dp,
-        changePercent: quote.changesPercentage || quote.dp
-      };
-      
-      setSelectedStock(stockWithPrice);
-      setSearchResults([]);
-      setSearchQuery(stock.symbol);
-    } catch (error) {
-      console.error('Failed to get stock quote:', error);
-      // Still allow selection with basic stock info
-      setSelectedStock(stock);
-      setSearchResults([]);
-      setSearchQuery(stock.symbol);
-    }
+    setSelectedStock(stock);
+    setSearchResults([]);
+    setSearchQuery(stock.symbol);
   };
 
   const handleTrade = async () => {
@@ -181,7 +144,6 @@ const PortfolioDetail = () => {
     
     try {
       setTradingLoading(true);
-      setError(null);
       
       const tradeData = {
         portfolio_id: portfolio.id,
@@ -192,50 +154,7 @@ const PortfolioDetail = () => {
         limit_price: tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) : undefined
       };
       
-      // Client-side validation
-      const errors = [];
-      
-      if (!tradeData.quantity || tradeData.quantity <= 0) {
-        errors.push('Please enter a valid quantity');
-      }
-      
-      if (tradeData.order_type === 'LIMIT' && (!tradeData.limit_price || tradeData.limit_price <= 0)) {
-        errors.push('Please enter a valid limit price');
-      }
-      
-      // Check buying power for BUY orders
-      if (tradeData.side === 'BUY' && portfolio) {
-        const price = tradeData.order_type === 'LIMIT' ? tradeData.limit_price : selectedStock.price;
-        const estimatedCost = tradeData.quantity * price * 1.001; // Include 0.1% commission
-        
-        if (portfolio.cash_balance < estimatedCost) {
-          errors.push(`Insufficient funds. Required: ${formatCurrency(estimatedCost)}, Available: ${formatCurrency(portfolio.cash_balance)}`);
-        }
-      }
-      
-      if (errors.length > 0) {
-        setNotification({
-          type: 'error',
-          message: errors.join(', ')
-        });
-        setTimeout(() => setNotification(null), 7000);
-        return;
-      }
-      
-      // Execute the trade
-      const result = await TradingAPI.executeTrade(tradeData);
-      
-      // Show success message
-      const action = tradeForm.side === 'BUY' ? 'bought' : 'sold';
-      const successMsg = `Successfully ${action} ${tradeForm.quantity} shares of ${selectedStock.symbol}`;
-      
-      setNotification({
-        type: 'success',
-        message: successMsg
-      });
-      
-      // Auto-hide notification after 5 seconds
-      setTimeout(() => setNotification(null), 5000);
+      await TradingAPI.executeTrade(tradeData);
       
       // Reload portfolio data
       await loadPortfolioData();
@@ -253,21 +172,7 @@ const PortfolioDetail = () => {
       
     } catch (error) {
       console.error('Trade execution error:', error);
-      let errorMessage = 'Failed to execute trade';
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.message) {
-        errorMessage = error.message;
-      }
-      
-      setNotification({
-        type: 'error',
-        message: errorMessage
-      });
-      
-      // Auto-hide error notification after 7 seconds
-      setTimeout(() => setNotification(null), 7000);
+      setError(error.message || 'Failed to execute trade');
     } finally {
       setTradingLoading(false);
     }
@@ -357,45 +262,6 @@ const PortfolioDetail = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Notification */}
-      {notification && (
-        <div className={`fixed top-4 right-4 z-50 max-w-md w-full ${
-          notification.type === 'success' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'
-        } border rounded-md shadow-lg`}>
-          <div className="p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                {notification.type === 'success' ? (
-                  <div className="h-5 w-5 rounded-full bg-green-100 flex items-center justify-center">
-                    <div className="h-2 w-2 bg-green-600 rounded-full"></div>
-                  </div>
-                ) : (
-                  <AlertCircle className="h-5 w-5 text-red-400" />
-                )}
-              </div>
-              <div className="ml-3 flex-1">
-                <p className={`text-sm font-medium ${
-                  notification.type === 'success' ? 'text-green-800' : 'text-red-800'
-                }`}>
-                  {notification.message}
-                </p>
-              </div>
-              <div className="ml-4 flex-shrink-0 flex">
-                <button
-                  onClick={() => setNotification(null)}
-                  className={`rounded-md inline-flex ${
-                    notification.type === 'success' ? 'text-green-400 hover:text-green-500' : 'text-red-400 hover:text-red-500'
-                  } focus:outline-none`}
-                >
-                  <span className="sr-only">Close</span>
-                  <AlertCircle className="h-4 w-4" />
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-      
       <div className="px-4 sm:px-6 lg:px-8 py-8">
         {/* Header */}
         <div className="mb-8">
@@ -569,53 +435,15 @@ const PortfolioDetail = () => {
               </label>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                  {searchLoading ? (
-                    <RefreshCw className="h-5 w-5 text-gray-400 animate-spin" />
-                  ) : (
-                    <Search className="h-5 w-5 text-gray-400" />
-                  )}
+                  <Search className="h-5 w-5 text-gray-400" />
                 </div>
                 <input
                   type="text"
                   id="stock-search"
                   value={searchQuery}
                   onChange={(e) => {
-                    const query = e.target.value;
-                    setSearchQuery(query);
-                    setSelectedSearchIndex(-1);
-                    
-                    // Clear existing timeout
-                    if (searchTimeout) {
-                      clearTimeout(searchTimeout);
-                    }
-                    
-                    // Set new timeout for debounced search
-                    const newTimeout = setTimeout(() => {
-                      handleStockSearch(query);
-                    }, 300);
-                    
-                    setSearchTimeout(newTimeout);
-                  }}
-                  onKeyDown={(e) => {
-                    if (searchResults.length === 0) return;
-                    
-                    if (e.key === 'ArrowDown') {
-                      e.preventDefault();
-                      setSelectedSearchIndex(prev => 
-                        prev < searchResults.length - 1 ? prev + 1 : 0
-                      );
-                    } else if (e.key === 'ArrowUp') {
-                      e.preventDefault();
-                      setSelectedSearchIndex(prev => 
-                        prev > 0 ? prev - 1 : searchResults.length - 1
-                      );
-                    } else if (e.key === 'Enter' && selectedSearchIndex >= 0) {
-                      e.preventDefault();
-                      handleSelectStock(searchResults[selectedSearchIndex]);
-                    } else if (e.key === 'Escape') {
-                      setSearchResults([]);
-                      setSelectedSearchIndex(-1);
-                    }
+                    setSearchQuery(e.target.value);
+                    handleStockSearch(e.target.value);
                   }}
                   className="appearance-none block w-full px-10 py-3 border border-gray-300 placeholder-gray-500 text-gray-900 rounded-md focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
                   placeholder="Search for stocks (e.g., AAPL, TSLA, AMZN)"
@@ -623,37 +451,23 @@ const PortfolioDetail = () => {
               </div>
               
               {/* Search Results */}
-              {(searchResults.length > 0 || searchLoading) && (
-                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-y-auto">
-                  {searchLoading && searchResults.length === 0 ? (
-                    <div className="px-4 py-3 text-sm text-gray-500 flex items-center">
-                      <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                      Searching...
-                    </div>
-                  ) : (
-                    searchResults.map((stock, index) => (
-                      <button
-                        key={stock.symbol || index}
-                        onClick={() => handleSelectStock(stock)}
-                        className={`w-full px-4 py-3 text-left flex items-center justify-between border-b border-gray-100 last:border-b-0 ${
-                          index === selectedSearchIndex ? 'bg-blue-50' : 'hover:bg-gray-100'
-                        }`}
-                      >
-                        <div className="flex-1">
-                          <div className="font-medium text-gray-900">{stock.symbol}</div>
-                          <div className="text-sm text-gray-500 truncate">{stock.name}</div>
-                        </div>
-                        <div className="text-sm text-gray-900 ml-2">
-                          {stock.price ? `$${stock.price.toFixed(2)}` : 'Quote'}
-                        </div>
-                      </button>
-                    ))
-                  )}
-                  {searchResults.length === 0 && !searchLoading && searchQuery.trim() && (
-                    <div className="px-4 py-3 text-sm text-gray-500">
-                      No stocks found for "{searchQuery}"
-                    </div>
-                  )}
+              {searchResults.length > 0 && (
+                <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg">
+                  {searchResults.map((stock) => (
+                    <button
+                      key={stock.symbol}
+                      onClick={() => handleSelectStock(stock)}
+                      className="w-full px-4 py-2 text-left hover:bg-gray-100 flex items-center justify-between"
+                    >
+                      <div>
+                        <div className="font-medium">{stock.symbol}</div>
+                        <div className="text-sm text-gray-500">{stock.name}</div>
+                      </div>
+                      <div className="text-sm text-gray-900">
+                        ${stock.price?.toFixed(2) || 'N/A'}
+                      </div>
+                    </button>
+                  ))}
                 </div>
               )}
             </div>
@@ -661,27 +475,11 @@ const PortfolioDetail = () => {
             {selectedStock && (
               <div className="border-t pt-4">
                 <div className="bg-gray-50 rounded-md p-4 mb-4">
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <h4 className="font-medium text-gray-900">{selectedStock.name}</h4>
-                      <p className="text-sm text-gray-600">{selectedStock.symbol}</p>
-                      <p className="text-lg font-semibold text-gray-900">
-                        ${selectedStock.price?.toFixed(2) || 'N/A'}
-                      </p>
-                    </div>
-                    {selectedStock.change !== undefined && (
-                      <div className={`text-right ${
-                        selectedStock.change >= 0 ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        <div className="text-sm font-medium">
-                          {selectedStock.change >= 0 ? '+' : ''}${selectedStock.change?.toFixed(2)}
-                        </div>
-                        <div className="text-xs">
-                          ({selectedStock.changePercent >= 0 ? '+' : ''}{selectedStock.changePercent?.toFixed(2)}%)
-                        </div>
-                      </div>
-                    )}
-                  </div>
+                  <h4 className="font-medium text-gray-900">{selectedStock.name}</h4>
+                  <p className="text-sm text-gray-600">{selectedStock.symbol}</p>
+                  <p className="text-lg font-semibold text-gray-900">
+                    ${selectedStock.price?.toFixed(2) || 'N/A'}
+                  </p>
                 </div>
 
                 {/* Trade Form */}
@@ -745,51 +543,6 @@ const PortfolioDetail = () => {
                   )}
                 </div>
 
-                {/* Trade Summary */}
-                {tradeForm.quantity && selectedStock.price && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-md p-4 mb-4">
-                    <h5 className="text-sm font-medium text-blue-900 mb-2">Trade Summary</h5>
-                    <div className="grid grid-cols-2 gap-4 text-sm">
-                      <div>
-                        <span className="text-blue-700">Shares:</span>
-                        <span className="ml-2 font-medium">{tradeForm.quantity}</span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700">Price per Share:</span>
-                        <span className="ml-2 font-medium">
-                          ${(tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) || selectedStock.price : selectedStock.price).toFixed(2)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700">Trade Value:</span>
-                        <span className="ml-2 font-medium">
-                          ${((parseFloat(tradeForm.quantity) || 0) * (tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) || selectedStock.price : selectedStock.price)).toFixed(2)}
-                        </span>
-                      </div>
-                      <div>
-                        <span className="text-blue-700">Estimated Cost:</span>
-                        <span className="ml-2 font-medium">
-                          ${(((parseFloat(tradeForm.quantity) || 0) * (tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) || selectedStock.price : selectedStock.price)) * (tradeForm.side === 'BUY' ? 1.001 : 0.999)).toFixed(2)}
-                        </span>
-                      </div>
-                    </div>
-                    {tradeForm.side === 'BUY' && portfolio && (
-                      <div className="mt-2 pt-2 border-t border-blue-200">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-blue-700">Available Cash:</span>
-                          <span className="font-medium">{formatCurrency(portfolio.cash_balance || 0)}</span>
-                        </div>
-                        {((parseFloat(tradeForm.quantity) || 0) * (tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) || selectedStock.price : selectedStock.price) * 1.001) > (portfolio.cash_balance || 0) && (
-                          <div className="mt-1 text-xs text-red-600 flex items-center">
-                            <AlertCircle className="h-3 w-3 mr-1" />
-                            Insufficient funds for this trade
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-
                 <div className="mt-4 flex justify-end space-x-3">
                   <button
                     onClick={() => setShowTradingPanel(false)}
@@ -799,19 +552,10 @@ const PortfolioDetail = () => {
                   </button>
                   <button
                     onClick={handleTrade}
-                    disabled={!tradeForm.quantity || tradingLoading || 
-                      (tradeForm.side === 'BUY' && portfolio && 
-                       ((parseFloat(tradeForm.quantity) || 0) * (tradeForm.orderType === 'LIMIT' ? parseFloat(tradeForm.limitPrice) || selectedStock.price : selectedStock.price) * 1.001) > (portfolio.cash_balance || 0))}
-                    className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                    disabled={!tradeForm.quantity || tradingLoading}
+                    className="px-4 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
                   >
-                    {tradingLoading ? (
-                      <>
-                        <RefreshCw className="h-4 w-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
-                    ) : (
-                      `${tradeForm.side} ${selectedStock.symbol}`
-                    )}
+                    {tradingLoading ? 'Processing...' : `${tradeForm.side} ${selectedStock.symbol}`}
                   </button>
                 </div>
               </div>
@@ -975,4 +719,4 @@ const PortfolioDetail = () => {
   );
 };
 
-export default PortfolioDetail;
+export default PortfolioDetailEnhanced;

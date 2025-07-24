@@ -84,7 +84,7 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
-      <Route path="/portfolios/:id" element={
+      <Route path="/portfolios/:username/:portfolioSlug" element={
         <ProtectedRoute>
           <AppLayout>
             <PortfolioDetail />
