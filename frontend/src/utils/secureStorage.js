@@ -120,17 +120,46 @@ export const secureStorage = new SecureStorage();
 
 // Token-specific storage utilities
 export const tokenStorage = {
-  setToken(token, expirationMinutes = 60) {
+  setToken(token, expirationMinutes = 480) {
     if (!token) {
       console.error('TokenStorage: Cannot store empty token');
       return false;
     }
-    secureStorage.setItem('auth_token', token, expirationMinutes);
+    // Store token with a version to handle expiration changes
+    const tokenData = {
+      token: token,
+      version: '1.0'
+    };
+    secureStorage.setItem('auth_token', tokenData, expirationMinutes);
+    if (config.isDevelopment) {
+      console.log(`🔐 Token stored with ${expirationMinutes}min expiration`);
+    }
     return true;
   },
 
   getToken() {
-    return secureStorage.getItem('auth_token');
+    const tokenData = secureStorage.getItem('auth_token');
+    if (!tokenData) {
+      if (config.isDevelopment) {
+        console.log('🔓 No token found in storage');
+      }
+      return null;
+    }
+    
+    // Handle old format (string) vs new format (object)
+    if (typeof tokenData === 'string') {
+      if (config.isDevelopment) {
+        console.log('🔑 Retrieved token (old format)');
+      }
+      return tokenData;
+    }
+    
+    // Return the token from the new format
+    const token = tokenData.token || null;
+    if (config.isDevelopment) {
+      console.log(token ? '🔑 Retrieved token (new format)' : '🔓 Token object exists but no token inside');
+    }
+    return token;
   },
 
   removeToken() {

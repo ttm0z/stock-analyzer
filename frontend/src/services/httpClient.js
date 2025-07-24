@@ -1,7 +1,7 @@
 import axios from 'axios';
 import { config } from '../config/environment';
 import { tokenStorage } from '../utils/secureStorage';
-import { csrfProtection } from '../utils/csrfProtection';
+// import { csrfProtection } from '../utils/csrfProtection';
 
 // Create axios instance with default configuration
 const httpClient = axios.create({
@@ -15,31 +15,40 @@ const httpClient = axios.create({
 
 // Request interceptor to add auth token and CSRF protection
 httpClient.interceptors.request.use(
-  (config) => {
+  (requestConfig) => {
     // Add auth token if available
     const token = tokenStorage.getToken();
+    if (config.isDevelopment) {
+      console.log(`🔍 Token check for ${requestConfig.method?.toUpperCase()} ${requestConfig.url}:`, token ? 'Token found' : 'No token');
+    }
+    
     if (token) {
-      config.headers.Authorization = `Bearer ${token}`;
+      requestConfig.headers.Authorization = `Bearer ${token}`;
+      if (config.isDevelopment) {
+        console.log(`🔑 Token attached to ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
+      }
+    } else if (config.isDevelopment) {
+      console.log(`⚠️ No token available for ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`);
     }
 
-    // Add CSRF token using protection utility
-    const csrfToken = csrfProtection.getToken();
-    if (csrfToken) {
-      config.headers[config.CSRF_TOKEN_HEADER] = csrfToken;
-    }
+    // Skip CSRF tokens for JWT-based API (not needed for stateless API)
+    // const csrfToken = csrfProtection.getToken();
+    // if (csrfToken) {
+    //   config.headers[config.CSRF_TOKEN_HEADER] = csrfToken;
+    // }
 
     // Add request timestamp for replay attack prevention
-    config.headers['X-Request-Timestamp'] = Date.now().toString();
+    requestConfig.headers['X-Request-Timestamp'] = Date.now().toString();
 
     // Log request in development
-    if (config.isDevelopment && !config.url?.includes('/auth/refresh')) {
-      console.log(`🔄 ${config.method?.toUpperCase()} ${config.url}`, {
-        headers: config.headers,
-        data: config.data
+    if (config.isDevelopment && !requestConfig.url?.includes('/auth/refresh')) {
+      console.log(`🔄 ${requestConfig.method?.toUpperCase()} ${requestConfig.url}`, {
+        headers: requestConfig.headers,
+        data: requestConfig.data
       });
     }
 
-    return config;
+    return requestConfig;
   },
   (error) => {
     console.error('Request interceptor error:', error);
@@ -66,7 +75,10 @@ httpClient.interceptors.response.use(
       try {
         const refreshToken = tokenStorage.getRefreshToken();
         if (!refreshToken) {
-          throw new Error('No refresh token available');
+          // No refresh token available, clear all data and redirect to login
+          tokenStorage.clearAll();
+          window.dispatchEvent(new CustomEvent('auth:token-expired'));
+          return Promise.reject(new Error('Session expired. Please log in again.'));
         }
 
         // Attempt to refresh token
@@ -74,16 +86,17 @@ httpClient.interceptors.response.use(
           refresh_token: refreshToken
         });
 
-        const { access_token, refresh_token: newRefreshToken } = response.data;
+        const { token, access_token, refresh_token: newRefreshToken } = response.data;
+        const newToken = token || access_token;
 
         // Store new tokens
-        tokenStorage.setToken(access_token);
+        tokenStorage.setToken(newToken);
         if (newRefreshToken) {
           tokenStorage.setRefreshToken(newRefreshToken);
         }
 
         // Retry original request with new token
-        originalRequest.headers.Authorization = `Bearer ${access_token}`;
+        originalRequest.headers.Authorization = `Bearer ${newToken}`;
         return httpClient(originalRequest);
 
       } catch (refreshError) {
@@ -99,16 +112,10 @@ httpClient.interceptors.response.use(
       }
     }
 
-    // Handle 403 (Forbidden) - CSRF token issues
+    // Handle 403 (Forbidden) - permissions issue
     if (error.response?.status === 403) {
-      const csrfError = error.response?.data?.message?.includes('CSRF') || 
-                       error.response?.statusText?.includes('Forbidden');
-      if (csrfError) {
-        console.error('CSRF token validation failed');
-        // Handle CSRF error using protection utility
-        csrfProtection.handleCSRFError();
-        return Promise.reject(new Error('CSRF token validation failed. Please try again.'));
-      }
+      console.error('Access forbidden - insufficient permissions');
+      return Promise.reject(new Error('Access forbidden. You do not have permission to perform this action.'));
     }
 
     // Handle network errors

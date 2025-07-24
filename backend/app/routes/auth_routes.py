@@ -58,8 +58,8 @@ def register():
         db.session.add(user)
         db.session.commit()
         
-        # Generate JWT token
-        token = user.generate_jwt_token()
+        # Generate JWT token (8 hours for paper trading app)
+        token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
         
         logger.info(f"New user registered: {email}")
         
@@ -108,8 +108,8 @@ def login():
         # Update last login
         user.update_last_login()
         
-        # Generate JWT token
-        token = user.generate_jwt_token()
+        # Generate JWT token (8 hours for paper trading app)
+        token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
         
         logger.info(f"User logged in: {user.email}")
         

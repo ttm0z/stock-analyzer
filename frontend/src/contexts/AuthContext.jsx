@@ -91,8 +91,15 @@ export const AuthProvider = ({ children }) => {
       const response = await AuthAPI.login(email, password);
       
       // Store tokens securely
-      const tokenExpiration = response.expires_in ? response.expires_in / 60 : 60; // Convert to minutes
-      AuthAPI.setToken(response.access_token, tokenExpiration);
+      const token = response.token || response.access_token;
+      // Backend JWT tokens expire after 8 hours (28800 seconds), so store for 480 minutes
+      const tokenExpiration = response.expires_in ? response.expires_in / 60 : 480; // 8 hours in minutes
+      
+      if (config.isDevelopment) {
+        console.log('🔐 About to store token:', token ? 'Token received' : 'No token received');
+      }
+      
+      AuthAPI.setToken(token, tokenExpiration);
       
       if (response.refresh_token) {
         AuthAPI.setRefreshToken(response.refresh_token);
@@ -100,11 +107,17 @@ export const AuthProvider = ({ children }) => {
       
       AuthAPI.setUser(response.user);
       
+      // Verify token was stored before dispatching success
+      const storedToken = tokenStorage.getToken();
+      if (config.isDevelopment) {
+        console.log('🔍 Token storage verification:', storedToken ? 'Token stored successfully' : 'Token NOT stored');
+      }
+      
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: {
           user: response.user,
-          token: response.access_token
+          token: token
         }
       });
       
@@ -134,8 +147,10 @@ export const AuthProvider = ({ children }) => {
       const response = await AuthAPI.register(email, password, firstName, lastName, username);
       
       // Store tokens securely
-      const tokenExpiration = response.expires_in ? response.expires_in / 60 : 60;
-      AuthAPI.setToken(response.access_token, tokenExpiration);
+      const token = response.token || response.access_token;
+      // Backend JWT tokens expire after 8 hours (28800 seconds), so store for 480 minutes
+      const tokenExpiration = response.expires_in ? response.expires_in / 60 : 480; // 8 hours in minutes
+      AuthAPI.setToken(token, tokenExpiration);
       
       if (response.refresh_token) {
         AuthAPI.setRefreshToken(response.refresh_token);
@@ -147,7 +162,7 @@ export const AuthProvider = ({ children }) => {
         type: 'LOGIN_SUCCESS',
         payload: {
           user: response.user,
-          token: response.access_token
+          token: token
         }
       });
       

@@ -8,6 +8,7 @@ from .routes.auth_routes import auth_bp
 from .routes.portfolio_routes import portfolio_bp
 from .routes.strategy_routes import strategy_bp
 from .routes.backtest_routes import backtest_bp
+from .routes.trading_routes import trading_bp
 from .services.cache_service import CacheService
 from .services.stock_service import StockService
 
@@ -48,18 +49,21 @@ def create_app():
     
     # Enable CORS with restricted origins
     allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
-    CORS(app, origins=[origin.strip() for origin in allowed_origins], 
+    CORS(app, 
+         origins=[origin.strip() for origin in allowed_origins], 
          supports_credentials=True,
          allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Timestamp'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'])
+         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+         max_age=600)
     
     # Register blueprints
     app.register_blueprint(test_bp, url_prefix='/test')
     app.register_blueprint(stock_bp, url_prefix='/api')
     app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(portfolio_bp, url_prefix='/api/portfolios')
-    app.register_blueprint(strategy_bp, url_prefix='/api/strategies')
-    app.register_blueprint(backtest_bp, url_prefix='/api/backtests')
+    app.register_blueprint(portfolio_bp, url_prefix='/api')
+    app.register_blueprint(strategy_bp, url_prefix='/api')
+    app.register_blueprint(backtest_bp, url_prefix='/api')
+    app.register_blueprint(trading_bp, url_prefix='/api/trading')
     
     # Add admin routes for cache management
     from .routes.admin_routes import admin_bp
