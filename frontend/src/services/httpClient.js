@@ -70,6 +70,21 @@ httpClient.interceptors.response.use(
 
     // Handle 401 (Unauthorized) - token expired
     if (error.response?.status === 401 && !originalRequest._retry) {
+      // Don't try to refresh tokens for auth endpoints (login, register, etc.)
+      if (originalRequest.url?.includes('/auth/login') || 
+          originalRequest.url?.includes('/auth/register') ||
+          originalRequest.url?.includes('/auth/refresh')) {
+        // For auth endpoints, just pass through the original error
+        return Promise.reject(error);
+      }
+
+      // Only try token refresh if we actually sent a token with the original request
+      const sentToken = originalRequest.headers?.Authorization;
+      if (!sentToken) {
+        // No token was sent, so this is not a token expiration issue
+        return Promise.reject(error);
+      }
+
       originalRequest._retry = true;
 
       try {
@@ -78,7 +93,7 @@ httpClient.interceptors.response.use(
           // No refresh token available, clear all data and redirect to login
           tokenStorage.clearAll();
           window.dispatchEvent(new CustomEvent('auth:token-expired'));
-          return Promise.reject(new Error('Session expired. Please log in again.'));
+          return Promise.reject(new Error('Authentication required. Please log in.'));
         }
 
         // Attempt to refresh token - use a new axios instance to avoid interceptor loops
@@ -178,7 +193,7 @@ function getUserFriendlyErrorMessage(error) {
     case 400:
       return 'Invalid request. Please check your input and try again.';
     case 401:
-      return 'Your session has expired. Please log in again.';
+      return 'Authentication required. Please log in.';
     case 403:
       return 'You do not have permission to perform this action.';
     case 404:

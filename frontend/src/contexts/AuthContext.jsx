@@ -66,15 +66,23 @@ export const AuthProvider = ({ children }) => {
     console.log("Stored token:", token);
     const storedUser = tokenStorage.getUser();
     
-    if (token && storedUser) {
+    // Only restore session if both token and user exist and token is valid
+    if (token && storedUser && tokenStorage.isAuthenticated()) {
       dispatch({
         type: 'LOGIN_SUCCESS',
         payload: { user: storedUser, token }
       });
+    } else if (token || storedUser) {
+      // If we have partial data, clear everything to ensure clean state
+      tokenStorage.clearAll();
+      if (config.isDevelopment) {
+        console.log('🧹 Cleared incomplete session data on startup');
+      }
     }
     
     // Listen for token expiration events
     const handleTokenExpired = () => {
+      tokenStorage.clearAll();
       dispatch({ type: 'LOGOUT' });
     };
     
@@ -87,6 +95,9 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     dispatch({ type: 'LOGIN_START' });
+    
+    // Clear any existing session data before login attempt
+    tokenStorage.clearAll();
     
     try {
       const response = await AuthAPI.login(email, password);
@@ -211,7 +222,18 @@ export const AuthProvider = ({ children }) => {
     } catch (error) {
       console.error('Logout error:', error);
     } finally {
+      // Clear ALL auth-related data
+      tokenStorage.clearAll();
+      
+      // Clear any cached auth state
       dispatch({ type: 'LOGOUT' });
+      
+      // Clear any pending auth events
+      window.removeEventListener('auth:token-expired', () => {});
+      
+      if (config.isDevelopment) {
+        console.log('✅ User logged out and all session data cleared');
+      }
     }
   };
 
