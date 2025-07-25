@@ -1,6 +1,6 @@
 # routes/stock_routes.py (Enhanced)
 from flask import Blueprint, request, jsonify, current_app
-from ..models.models import Trade, db
+from ..db import db
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
 import logging
 

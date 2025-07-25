@@ -123,14 +123,14 @@ def execute_trade():
         transaction = Transaction(
             portfolio_id=portfolio_id,
             symbol=validated_symbol,
-            side=side,
+            transaction_type=side,
             quantity=quantity,
             price=execution_price,
             total_value=trade_value,
             commission=commission,
-            order_type=order_type,
-            status='FILLED',
-            executed_at=datetime.utcnow()
+            transaction_date=datetime.utcnow(),
+            cash_impact=total_cost if side == 'BUY' else -(trade_value - commission),
+            status='FILLED'
         )
         
         db.session.add(transaction)
@@ -187,8 +187,6 @@ def execute_trade():
                 # If position is fully closed, mark as closed
                 if position.quantity <= 0:
                     position.is_open = False
-                    position.close_date = datetime.utcnow()
-                    position.close_price = execution_price
                 else:
                     # Update cost basis for remaining shares
                     position.cost_basis = position.avg_entry_price * position.quantity
@@ -218,7 +216,7 @@ def execute_trade():
                 'total_value': trade_value,
                 'commission': commission,
                 'net_amount': total_cost if side == 'BUY' else (trade_value - commission),
-                'executed_at': transaction.executed_at.isoformat(),
+                'executed_at': transaction.transaction_date.isoformat(),
                 'status': transaction.status
             },
             'portfolio_update': {
@@ -261,10 +259,10 @@ def get_portfolio_transactions(portfolio_id):
         if symbol:
             query = query.filter(Transaction.symbol == symbol.upper())
         if side:
-            query = query.filter(Transaction.side == side.upper())
+            query = query.filter(Transaction.transaction_type == side.upper())
         
         # Apply pagination and ordering
-        query = query.order_by(Transaction.executed_at.desc())
+        query = query.order_by(Transaction.transaction_date.desc())
         total_count = query.count()
         transactions = query.offset(offset).limit(min(limit, 100)).all()
         
@@ -274,16 +272,14 @@ def get_portfolio_transactions(portfolio_id):
             transactions_data.append({
                 'id': transaction.id,
                 'symbol': transaction.symbol,
-                'side': transaction.side,
+                'side': transaction.transaction_type,
                 'quantity': transaction.quantity,
                 'price': transaction.price,
                 'total_value': transaction.total_value,
                 'commission': transaction.commission,
-                'net_amount': transaction.total_value + transaction.commission if transaction.side == 'BUY' else transaction.total_value - transaction.commission,
-                'order_type': transaction.order_type,
+                'net_amount': transaction.total_value + transaction.commission if transaction.transaction_type == 'BUY' else transaction.total_value - transaction.commission,
                 'status': transaction.status,
-                'executed_at': transaction.executed_at.isoformat() if transaction.executed_at else None,
-                'notes': transaction.notes
+                'executed_at': transaction.transaction_date.isoformat() if transaction.transaction_date else None
             })
         
         return jsonify({
@@ -329,7 +325,7 @@ def get_portfolio_orders(portfolio_id):
             query = query.filter(Transaction.status == status.upper())
         
         # Apply pagination and ordering
-        query = query.order_by(Transaction.created_at.desc())
+        query = query.order_by(Transaction.transaction_date.desc())
         total_count = query.count()
         orders = query.offset(offset).limit(min(limit, 100)).all()
         
@@ -339,13 +335,11 @@ def get_portfolio_orders(portfolio_id):
             orders_data.append({
                 'id': order.id,
                 'symbol': order.symbol,
-                'side': order.side,
+                'side': order.transaction_type,
                 'quantity': order.quantity,
-                'order_type': order.order_type,
-                'limit_price': order.price if order.order_type == 'LIMIT' else None,
                 'status': order.status,
                 'created_at': order.created_at.isoformat(),
-                'executed_at': order.executed_at.isoformat() if order.executed_at else None,
+                'executed_at': order.transaction_date.isoformat() if order.transaction_date else None,
                 'total_value': order.total_value if order.status == 'FILLED' else None,
                 'commission': order.commission if order.status == 'FILLED' else None
             })

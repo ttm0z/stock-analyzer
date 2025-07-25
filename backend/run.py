@@ -1,6 +1,10 @@
 import os
 from dotenv import load_dotenv
-from app import create_app
+
+# Import from optimized app.py instead of app module
+import sys
+sys.path.insert(0, '/home/t/Projects/stock-analyzer/backend')
+from app import create_app  # Use optimized PostgreSQL app factory
 
 # Load environment variables from .env file
 load_dotenv()
