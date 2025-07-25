@@ -72,12 +72,20 @@ def execute_trade():
         # Get current stock price
         stock_service = current_app.stock_service
         try:
-            quote_data = stock_service.get_quote(validated_symbol)
+            quote_data = stock_service.fetch_stock_data(validated_symbol)
             
-            if not quote_data or 'price' not in quote_data:
+            # Handle different possible field names for price
+            current_price = None
+            if quote_data:
+                if 'price' in quote_data:
+                    current_price = float(quote_data['price'])
+                elif 'c' in quote_data:
+                    current_price = float(quote_data['c'])
+                elif 'close' in quote_data:
+                    current_price = float(quote_data['close'])
+            
+            if not current_price:
                 return jsonify({'error': f'Unable to get current price for {validated_symbol}'}), 400
-            
-            current_price = float(quote_data['price'])
             
             # For market orders, use current price. For limit orders, use limit price
             execution_price = current_price if order_type == 'MARKET' else float(limit_price)
@@ -108,7 +116,7 @@ def execute_trade():
         
         # For SELL orders, check if user has enough shares
         if side == 'SELL':
-            existing_position = Position.query.filter_by(
+            existing_position = session.query(Position).filter_by(
                 portfolio_id=portfolio_id,
                 symbol=validated_symbol,
                 is_open=True
@@ -143,7 +151,7 @@ def execute_trade():
             portfolio.cash_balance += (trade_value - commission)
         
         # Update or create position
-        position = Position.query.filter_by(
+        position = session.query(Position).filter_by(
             portfolio_id=portfolio_id,
             symbol=validated_symbol,
             is_open=True
@@ -255,8 +263,9 @@ def get_portfolio_transactions(portfolio_id):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query
-        query = Transaction.query.filter_by(portfolio_id=portfolio_id)
+        # Build query using session
+        session = get_db_session()
+        query = session.query(Transaction).filter_by(portfolio_id=portfolio_id)
         
         if symbol:
             query = query.filter(Transaction.symbol == symbol.upper())
@@ -321,8 +330,9 @@ def get_portfolio_orders(portfolio_id):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query
-        query = Transaction.query.filter_by(portfolio_id=portfolio_id)
+        # Build query using session
+        session = get_db_session()
+        query = session.query(Transaction).filter_by(portfolio_id=portfolio_id)
         
         if status:
             query = query.filter(Transaction.status == status.upper())
@@ -375,13 +385,20 @@ def get_trading_quote(symbol):
         
         # Get quote from stock service
         stock_service = current_app.stock_service
-        quote_data = stock_service.get_quote(validated_symbol)
+        quote_data = stock_service.fetch_stock_data(validated_symbol)
         
         if not quote_data:
             return jsonify({'error': f'Quote not available for {validated_symbol}'}), 404
         
         # Calculate estimated commission (0.1% of trade value)
-        price = float(quote_data.get('price', 0))
+        # Handle different possible field names for price
+        price = 0
+        if 'price' in quote_data:
+            price = float(quote_data['price'])
+        elif 'c' in quote_data:
+            price = float(quote_data['c'])
+        elif 'close' in quote_data:
+            price = float(quote_data['close'])
         estimated_commission_rate = 0.001
         
         return jsonify({

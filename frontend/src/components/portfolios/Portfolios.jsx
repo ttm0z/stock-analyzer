@@ -19,7 +19,6 @@ import PortfolioAPI from '../../services/portfolioAPI';
 import CreatePortfolioModal from './CreatePortfolioModal';
 import EditPortfolioModal from './EditPortfolioModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import { generatePortfolioUrl } from '../../utils/portfolioUtils';
 
 const Portfolios = () => {
   const { user, token } = useAuth();
@@ -143,8 +142,7 @@ const Portfolios = () => {
   };
 
   const handleViewPortfolio = (portfolio) => {
-    const portfolioUrl = generatePortfolioUrl(user.username, portfolio.name);
-    navigate(portfolioUrl);
+    navigate(`/portfolios/${portfolio.id}`);
   };
 
   if (loading) {

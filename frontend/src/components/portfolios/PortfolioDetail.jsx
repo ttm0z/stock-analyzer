@@ -27,17 +27,13 @@ import StockAPI from '../../services/stockAPI';
 import EditPortfolioModal from './EditPortfolioModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { 
-  parsePortfolioUrl, 
-  canAccessPortfolio, 
-  findPortfolioByName,
   formatCurrency,
   formatPercentage,
-  calculatePortfolioMetrics,
-  generatePortfolioUrl
+  calculatePortfolioMetrics
 } from '../../utils/portfolioUtils';
 
 const PortfolioDetail = () => {
-  const { username, portfolioSlug } = useParams();
+  const { portfolioId } = useParams();
   const { user, token } = useAuth();
   const navigate = useNavigate();
   
@@ -70,16 +66,10 @@ const PortfolioDetail = () => {
   const [selectedSearchIndex, setSelectedSearchIndex] = useState(-1);
 
   useEffect(() => {
-    if (user && token && username && portfolioSlug) {
-      // Check if user can access this portfolio
-      if (!canAccessPortfolio(user, username)) {
-        navigate('/portfolios');
-        return;
-      }
-      
+    if (user && token && portfolioId) {
       loadPortfolioData();
     }
-  }, [user, token, username, portfolioSlug]);
+  }, [user, token, portfolioId]);
 
   // Cleanup search timeout on unmount
   useEffect(() => {
@@ -95,28 +85,14 @@ const PortfolioDetail = () => {
       setLoading(true);
       setError(null);
       
-      const { portfolioName } = parsePortfolioUrl(username, portfolioSlug);
-      
-      // Get all user portfolios to find the matching one
-      const response = await PortfolioAPI.getPortfolios();
-      const userPortfolios = response.portfolios || [];
-      
-      // Find portfolio by name
-      const foundPortfolio = findPortfolioByName(userPortfolios, portfolioName);
-      
-      if (!foundPortfolio) {
-        setError('Portfolio not found');
-        return;
-      }
-      
-      // Load detailed portfolio data
-      const portfolioResponse = await PortfolioAPI.getPortfolioDetails(foundPortfolio.id);
+      // Load detailed portfolio data directly using portfolio ID
+      const portfolioResponse = await PortfolioAPI.getPortfolioDetails(portfolioId);
       setPortfolio(portfolioResponse.portfolio);
       setPositions(portfolioResponse.positions || []);
       
       // Load recent transactions
       try {
-        const transactionsResponse = await TradingAPI.getPortfolioTransactions(foundPortfolio.id, { limit: 10 });
+        const transactionsResponse = await TradingAPI.getPortfolioTransactions(portfolioId, { limit: 10 });
         setTransactions(transactionsResponse.transactions || []);
       } catch (transError) {
         console.warn('Failed to load transactions:', transError);
@@ -286,10 +262,6 @@ const PortfolioDetail = () => {
   const handlePortfolioUpdated = (updatedPortfolio) => {
     setPortfolio(updatedPortfolio.portfolio);
     setShowEditModal(false);
-    
-    // Update URL if name changed
-    const newUrl = generatePortfolioUrl(user.username, updatedPortfolio.portfolio.name);
-    navigate(newUrl, { replace: true });
   };
 
   const handlePortfolioDeleted = () => {
@@ -410,8 +382,6 @@ const PortfolioDetail = () => {
               <div>
                 <h1 className="text-3xl font-bold text-gray-900">{portfolio.name}</h1>
                 <div className="flex items-center mt-2 space-x-4 text-sm text-gray-600">
-                  <span>@{username}</span>
-                  <span>•</span>
                   <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
                     portfolio.portfolio_type === 'live' ? 'bg-green-100 text-green-800' :
                     portfolio.portfolio_type === 'paper' ? 'bg-blue-100 text-blue-800' :

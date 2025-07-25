@@ -65,24 +65,54 @@ class StockService:
         symbol = symbol.upper().strip()
         cache_key = f"quote:{symbol}"
         
-        # Try cache first
-        if self.cache_service:
-            cached_result = self.cache_service.get('stock_quotes', cache_key)
-            if cached_result is not None:
-                self.cache_hit_count += 1
-                logger.debug(f"🎯 Cache hit for quote: {symbol}")
-                print(f"🎯 Cache hit for quote: {symbol}")
-                
-                return cached_result
+        # # Try cache first
+        # if self.cache_service:
+        #     cached_result = self.cache_service.get('stock_quotes', cache_key)
+        #     if cached_result is not None:
+        #         self.cache_hit_count += 1
+        #         logger.debug(f"🎯 Cache hit for quote: {symbol}")
+        #         print(f"🎯 Cache hit for quote: {symbol}")
+        #         print(cached_result)
+        #         return cached_result
         
         # Make API call (your original implementation)
         result = self._make_request('/quote', {'symbol': symbol})
         print("fetching quote . . . ")
+        
         # Handle response format
         quote_data = result[0] if isinstance(result, list) and result else result
         
+        # If quote endpoint returns empty data, fallback to profile endpoint
+        if not quote_data or (isinstance(quote_data, list) and len(quote_data) == 0):
+            logger.warning(f"Quote endpoint returned empty for {symbol}, trying profile endpoint")
+            print(f"Quote endpoint empty for {symbol}, trying profile endpoint...")
+            
+            try:
+                profile_result = self._make_request('/profile', {'symbol': symbol})
+                profile_data = profile_result[0] if isinstance(profile_result, list) and profile_result else profile_result
+                
+                if profile_data and 'price' in profile_data:
+                    # Convert profile data to quote format
+                    quote_data = {
+                        'symbol': symbol,
+                        'price': profile_data['price'],
+                        'c': profile_data['price'],  # close price alias
+                        'close': profile_data['price'],
+                        'change': profile_data.get('changes', 0),
+                        'change_percent': profile_data.get('changes', 0) / profile_data['price'] * 100 if profile_data['price'] != 0 else 0,
+                        'volume': profile_data.get('volAvg', 0),
+                        'name': profile_data.get('companyName', symbol)
+                    }
+                    print(f"Using profile data for {symbol}: price={quote_data['price']}")
+                else:
+                    logger.error(f"Profile endpoint also failed for {symbol}")
+                    return {}
+            except Exception as e:
+                logger.error(f"Profile fallback failed for {symbol}: {e}")
+                return {}
+        
         # Cache result
-        if self.cache_service:
+        if self.cache_service and quote_data:
             self.cache_service.set('stock_quotes', cache_key, quote_data, CacheTTL.REAL_TIME_QUOTES)
         print(quote_data)
         return quote_data
