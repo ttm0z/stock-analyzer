@@ -105,14 +105,14 @@ class ReportGenerator:
     
     def _generate_report_metadata(self, strategy_config: Dict = None) -> Dict[str, Any]:
         """Generate report metadata"""
-        metadata = {
+        additional_metadata = {
             'generated_at': datetime.now().isoformat(),
             'report_version': '1.0',
             'generator': 'Backtesting Engine Report Generator'
         }
         
         if strategy_config:
-            metadata.update({
+            additional_metadata.update({
                 'strategy_name': strategy_config.get('strategy_name', 'Unknown'),
                 'backtest_period': {
                     'start_date': strategy_config.get('start_date'),
@@ -122,7 +122,7 @@ class ReportGenerator:
                 'universe_size': len(strategy_config.get('universe', []))
             })
         
-        return metadata
+        return additional_metadata
     
     def _generate_executive_summary(self, performance_metrics: PerformanceMetrics,
                                   trade_metrics: TradeMetrics = None) -> Dict[str, Any]:
@@ -773,10 +773,10 @@ class ReportGenerator:
         # Header
         html_parts.append('<div class="header">')
         html_parts.append('<h1>Backtesting Report</h1>')
-        if 'metadata' in report:
-            metadata = report['metadata']
-            html_parts.append(f"<p>Generated: {metadata.get('generated_at', '')}</p>")
-            html_parts.append(f"<p>Strategy: {metadata.get('strategy_name', 'Unknown')}</p>")
+        if 'additional_metadata' in report:
+            additional_metadata = report['additional_metadata']
+            html_parts.append(f"<p>Generated: {additional_metadata.get('generated_at', '')}</p>")
+            html_parts.append(f"<p>Strategy: {additional_metadata.get('strategy_name', 'Unknown')}</p>")
         html_parts.append('</div>')
         
         # Executive Summary

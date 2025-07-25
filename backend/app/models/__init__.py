@@ -7,15 +7,15 @@ organized by functional area.
 
 from .base import Base, BaseModel, TimestampMixin
 
-# User and authentication models
+# User and authentication models - import from auth module
+from ..auth.models import User, APIKey as ApiKey
 from .user_models import (
-    User, ApiKey, UserSession, UserPreferences
+    UserSession, UserPreferences
 )
 
 # Market data models
 from .market_data import (
-    Asset, MarketData, MarketDataAdjustment, DataSource, 
-    DataQuality, MarketCalendar, Benchmark
+    Asset, MarketData, Benchmark, MarketDataAdjustment, DataSource, DataQuality, MarketCalendar
 )
 
 # Strategy models

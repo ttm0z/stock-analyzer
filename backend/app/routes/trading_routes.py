@@ -1,11 +1,11 @@
 """
 Paper Trading API routes
 """
-from flask import Blueprint, request, jsonify, current_app
-from ..db import db
+from flask import Blueprint, request, jsonify, current_app, g
 from ..models.portfolio_models import Portfolio, Position, Transaction
 from ..auth.decorators import token_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
+from ..database import get_db_session
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -59,7 +59,8 @@ def execute_trade():
             return jsonify({'error': f'Invalid symbol: {symbol}'}), 400
         
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id,
             user_id=g.current_user.id,
             is_active=True
@@ -133,7 +134,7 @@ def execute_trade():
             status='FILLED'
         )
         
-        db.session.add(transaction)
+        session.add(transaction)
         
         # Update portfolio cash balance
         if side == 'BUY':
@@ -165,7 +166,7 @@ def execute_trade():
                     last_update_date=datetime.utcnow(),
                     is_open=True
                 )
-                db.session.add(position)
+                session.add(position)
         else:
             # Update existing position
             if side == 'BUY':
@@ -201,7 +202,7 @@ def execute_trade():
         portfolio.calculate_portfolio_value()
         portfolio.last_updated = datetime.utcnow()
         
-        db.session.commit()
+        session.commit()
         
         logger.info(f"Trade executed: {side} {quantity} {validated_symbol} @ ${execution_price:.2f} for user {g.current_user.id}")
         
@@ -239,7 +240,8 @@ def get_portfolio_transactions(portfolio_id):
     
     try:
         # Verify portfolio ownership
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()
@@ -305,7 +307,8 @@ def get_portfolio_orders(portfolio_id):
     
     try:
         # Verify portfolio ownership
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()
@@ -410,7 +413,8 @@ def get_buying_power(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()

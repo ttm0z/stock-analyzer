@@ -1,87 +1,50 @@
 import os
 from flask import Flask
 from flask_cors import CORS
-from .db import db
-from .routes.stock_routes import stock_bp
-from .routes.test_routes import test_bp
-from .routes.auth_routes import auth_bp
-from .routes.portfolio_routes import portfolio_bp
-from .routes.strategy_routes import strategy_bp
-from .routes.backtest_routes import backtest_bp
-from .routes.trading_routes import trading_bp
-from .routes.settings_routes import settings_bp
-from .routes.market_routes import market_bp
-from .services.cache_service import CacheService
-from .services.stock_service import StockService
+from sqlalchemy import create_engine
+from sqlalchemy.orm import sessionmaker
+from .models.base import Base
+from .services import init_services
+from .routes import register_blueprints
+from .cli import register_cli_commands
+from .database import init_db_session_handlers
+# Import all models to register them with Base.metadata
+from .models import *  # This imports all models
+from .auth.models import User, APIKey
+
 
 def create_app():
     app = Flask(__name__)
-    
-    # Security Configuration
-    app.secret_key = os.getenv('FLASK_SECRET_KEY')
-    if not app.secret_key:
-        raise ValueError("FLASK_SECRET_KEY environment variable is required")
-    
-    app.config['SECRET_KEY'] = app.secret_key
-    app.config['WTF_CSRF_ENABLED'] = True
-    app.config['SESSION_COOKIE_SECURE'] = os.getenv('FLASK_ENV') != 'development'
-    app.config['SESSION_COOKIE_HTTPONLY'] = True
-    app.config['SESSION_COOKIE_SAMESITE'] = 'Lax'
-    
-    # Database configuration
-    app.config['SQLALCHEMY_DATABASE_URI'] = os.getenv(
-        'DATABASE_URL',
-        'postgresql://stockuser:change_this_password@localhost:5432/stockdb'
-    )
-    app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
-    
-    # Initialize database
-    db.init_app(app)
-    
-    # Initialize Redis cache service
-    cache_service = CacheService.create_instance()
-    app.cache_service = cache_service
-    
-    # Initialize enhanced stock service with caching
-    fmp_api_key = os.getenv('FMP_API_KEY')
-    if not fmp_api_key:
-        raise ValueError("FMP_API_KEY environment variable is required")
-    
-    app.stock_service = StockService(fmp_api_key, cache_service)
-    
-    # Enable CORS with restricted origins
-    allowed_origins = os.getenv('ALLOWED_ORIGINS', 'http://localhost:3000,http://localhost:5173').split(',')
-    CORS(app, 
-         origins=[origin.strip() for origin in allowed_origins], 
-         supports_credentials=True,
-         allow_headers=['Content-Type', 'Authorization', 'X-CSRF-Token', 'X-Request-Timestamp'],
-         methods=['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-         max_age=600)
-    
-    # Register blueprints
-    app.register_blueprint(test_bp, url_prefix='/test')
-    app.register_blueprint(stock_bp, url_prefix='/api')
-    app.register_blueprint(auth_bp, url_prefix='/api/auth')
-    app.register_blueprint(portfolio_bp, url_prefix='/api')
-    app.register_blueprint(strategy_bp, url_prefix='/api')
-    app.register_blueprint(backtest_bp, url_prefix='/api')
-    app.register_blueprint(trading_bp, url_prefix='/api/trading')
-    app.register_blueprint(settings_bp, url_prefix='/api/settings')
-    app.register_blueprint(market_bp, url_prefix='/api/market')
-    
-    # Add admin routes for cache management
-    from .routes.admin_routes import admin_bp
-    app.register_blueprint(admin_bp, url_prefix='/api/admin')
-    
-    with app.app_context():
-        # Create tables if they don't exist
-        try:
-            db.create_all()
-        except Exception as e:
-            import logging
-            logger = logging.getLogger(__name__)
-            logger.warning(f"Could not create database tables: {e}")
-            logger.info("Database tables may need to be created manually")
-    
-    return app
 
+    # Core Configuration
+    app.secret_key = os.getenv('FLASK_SECRET_KEY', 'dev')
+    database_url = os.getenv('DATABASE_URL', 'postgresql://user:pass@localhost:5432/stockdb')
+    app.config['DATABASE_URL'] = database_url
+
+    # CORS
+    allowed_origins = os.getenv('ALLOWED_ORIGINS', '').split(',')
+    CORS(app, 
+         origins=[origin.strip() for origin in allowed_origins if origin.strip()],
+         supports_credentials=True)
+
+    # Database setup with SQLAlchemy Core
+    engine = create_engine(database_url)
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    
+    # Store session factory in app config
+    app.config['SESSION_FACTORY'] = Session
+
+    # Database session handlers
+    init_db_session_handlers(app)
+
+    # Services
+    init_services(app)
+
+    # Blueprints
+    register_blueprints(app)
+
+    # CLI Commands
+    register_cli_commands(app)
+
+    return app

@@ -1,376 +1,391 @@
-from sqlalchemy import Column, Integer, String, Float, DateTime, Boolean, Text, ForeignKey, Index
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Index, CheckConstraint, Numeric, Text
 from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.sqlite import JSON
+from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
-import json
-
 from .base import BaseModel
 
 class RiskProfile(BaseModel):
-    """Risk profile settings for users/strategies"""
+    """Risk profile model for user risk management with PostgreSQL optimizations."""
     __tablename__ = 'risk_profiles'
     
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    # Foreign key
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Profile identification
     name = Column(String(100), nullable=False)
     description = Column(Text, nullable=True)
-    is_default = Column(Boolean, default=False, nullable=False)
+    profile_type = Column(String(20), default='custom', nullable=False, index=True)
     
-    # Position sizing limits
-    max_position_size = Column(Float, default=0.1, nullable=False)  # 10% of portfolio
-    max_portfolio_risk = Column(Float, default=0.02, nullable=False)  # 2% max risk per trade
-    max_sector_exposure = Column(Float, default=0.3, nullable=False)  # 30% max per sector
-    max_correlation_exposure = Column(Float, default=0.5, nullable=False)  # 50% max correlated positions
+    # Risk tolerance settings
+    risk_tolerance = Column(String(20), nullable=False, index=True)  # conservative, moderate, aggressive
+    time_horizon = Column(String(20), nullable=False)  # short, medium, long
+    investment_experience = Column(String(20), nullable=False)  # beginner, intermediate, expert
     
-    # Stop loss settings
-    default_stop_loss = Column(Float, default=0.05, nullable=False)  # 5% stop loss
-    max_stop_loss = Column(Float, default=0.15, nullable=False)  # 15% max stop loss
+    # Position sizing rules - Using Numeric for precision
+    max_position_size_pct = Column(Numeric(5, 2), default=10.0, nullable=False)  # % of portfolio
+    max_sector_exposure_pct = Column(Numeric(5, 2), default=25.0, nullable=False)  # % of portfolio
+    max_single_stock_pct = Column(Numeric(5, 2), default=5.0, nullable=False)   # % of portfolio
+    max_correlation_threshold = Column(Numeric(5, 4), default=0.7, nullable=False)
+    
+    # Risk limits - Using Numeric for precision
+    max_portfolio_var = Column(Numeric(8, 4), default=5.0, nullable=False)  # Value at Risk %
+    max_expected_shortfall = Column(Numeric(8, 4), default=7.5, nullable=False)  # Expected Shortfall %
+    max_drawdown_limit = Column(Numeric(8, 4), default=20.0, nullable=False)  # Max allowable drawdown %
+    
+    # Volatility constraints
+    max_portfolio_volatility = Column(Numeric(8, 4), default=15.0, nullable=False)  # Annual volatility %
+    target_sharpe_ratio = Column(Numeric(8, 4), default=1.0, nullable=False)
+    
+    # Leverage and margin settings
+    max_leverage = Column(Numeric(5, 2), default=1.0, nullable=False)  # 1.0 = no leverage
+    allow_margin = Column(Boolean, default=False, nullable=False)
+    allow_short_selling = Column(Boolean, default=False, nullable=False)
+    allow_options = Column(Boolean, default=False, nullable=False)
+    
+    # Asset class restrictions
+    allowed_asset_classes = Column(JSONB, nullable=False)  # List of allowed asset classes
+    forbidden_assets = Column(JSONB, nullable=True)       # List of forbidden symbols/sectors
+    geographic_restrictions = Column(JSONB, nullable=True) # Geographic investment restrictions
+    
+    # Rebalancing rules
+    rebalancing_frequency = Column(String(20), default='monthly', nullable=False)
+    rebalancing_threshold = Column(Numeric(5, 2), default=5.0, nullable=False)  # % deviation trigger
+    drift_tolerance = Column(Numeric(5, 2), default=2.0, nullable=False)  # % tolerance before rebalancing
+    
+    # Stop-loss and take-profit rules
+    default_stop_loss_pct = Column(Numeric(5, 2), nullable=True)      # Default stop-loss %
+    default_take_profit_pct = Column(Numeric(5, 2), nullable=True)    # Default take-profit %
     trailing_stop_enabled = Column(Boolean, default=False, nullable=False)
-    trailing_stop_distance = Column(Float, default=0.03, nullable=False)  # 3%
     
-    # Leverage and margin
-    max_leverage = Column(Float, default=1.0, nullable=False)  # No leverage by default
-    margin_requirement = Column(Float, default=0.25, nullable=False)  # 25% margin requirement
+    # Profile status
+    is_active = Column(Boolean, default=True, nullable=False, index=True)
+    is_default = Column(Boolean, default=False, nullable=False)
+    last_review_date = Column(DateTime, nullable=True)
+    next_review_date = Column(DateTime, nullable=True)
     
-    # Drawdown limits
-    max_portfolio_drawdown = Column(Float, default=0.15, nullable=False)  # 15% max drawdown
-    daily_loss_limit = Column(Float, default=0.03, nullable=False)  # 3% daily loss limit
-    
-    # Risk monitoring
-    var_confidence_level = Column(Float, default=0.95, nullable=False)  # 95% VaR
-    var_time_horizon = Column(Integer, default=1, nullable=False)  # 1 day
-    stress_test_enabled = Column(Boolean, default=True, nullable=False)
+    # Advanced risk settings stored as JSONB
+    advanced_settings = Column(JSONB, nullable=True)
+    custom_constraints = Column(JSONB, nullable=True)
     
     # Relationships
-    user = relationship("User")
-    risk_limits = relationship("RiskLimit", back_populates="risk_profile", cascade="all, delete-orphan")
+    user = relationship("User", back_populates="risk_profiles")
+    risk_metrics = relationship("RiskMetrics", back_populates="risk_profile", cascade="all, delete-orphan")
     
-    # Index for efficient queries
+    # Indexes for performance
     __table_args__ = (
-        Index('idx_risk_profile_user_default', 'user_id', 'is_default'),
-    )
-
-class RiskLimit(BaseModel):
-    """Specific risk limits and constraints"""
-    __tablename__ = 'risk_limits'
-    
-    risk_profile_id = Column(Integer, ForeignKey('risk_profiles.id'), nullable=False)
-    limit_type = Column(String(50), nullable=False)  # position_size, sector_exposure, correlation, etc.
-    limit_name = Column(String(100), nullable=False)
-    
-    # Limit values
-    max_value = Column(Float, nullable=True)
-    min_value = Column(Float, nullable=True)
-    target_value = Column(Float, nullable=True)
-    
-    # Limit scope
-    applies_to = Column(String(50), nullable=False)  # portfolio, position, sector, asset_class
-    scope_filter = Column(JSON, nullable=True)  # Filter criteria (sectors, symbols, etc.)
-    
-    # Limit behavior
-    is_hard_limit = Column(Boolean, default=True, nullable=False)  # Hard vs soft limit
-    warning_threshold = Column(Float, nullable=True)  # Warning level (% of limit)
-    action_on_breach = Column(String(50), nullable=False)  # block, warn, reduce_position
-    
-    # Status
-    is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Relationships
-    risk_profile = relationship("RiskProfile", back_populates="risk_limits")
-    violations = relationship("RiskViolation", back_populates="risk_limit", cascade="all, delete-orphan")
-    
-    # Index for efficient queries
-    __table_args__ = (
-        Index('idx_risk_limit_profile_type', 'risk_profile_id', 'limit_type'),
+        Index('idx_risk_profile_user_active', 'user_id', 'is_active'),
+        Index('idx_risk_profile_type_tolerance', 'profile_type', 'risk_tolerance'),
+        CheckConstraint('risk_tolerance IN (\'conservative\', \'moderate\', \'aggressive\')', name='ck_risk_tolerance_valid'),
+        CheckConstraint('time_horizon IN (\'short\', \'medium\', \'long\')', name='ck_time_horizon_valid'),
+        CheckConstraint('investment_experience IN (\'beginner\', \'intermediate\', \'expert\')', name='ck_investment_experience_valid'),
+        CheckConstraint('profile_type IN (\'conservative\', \'moderate\', \'aggressive\', \'custom\')', name='ck_profile_type_valid'),
+        CheckConstraint('max_position_size_pct > 0 AND max_position_size_pct <= 100', name='ck_max_position_size_valid'),
+        CheckConstraint('max_sector_exposure_pct > 0 AND max_sector_exposure_pct <= 100', name='ck_max_sector_exposure_valid'),
+        CheckConstraint('max_single_stock_pct > 0 AND max_single_stock_pct <= 100', name='ck_max_single_stock_valid'),
+        CheckConstraint('max_correlation_threshold >= 0 AND max_correlation_threshold <= 1', name='ck_max_correlation_valid'),
+        CheckConstraint('max_portfolio_var > 0 AND max_portfolio_var <= 100', name='ck_max_var_valid'),
+        CheckConstraint('max_expected_shortfall > 0 AND max_expected_shortfall <= 100', name='ck_max_es_valid'),
+        CheckConstraint('max_drawdown_limit > 0 AND max_drawdown_limit <= 100', name='ck_max_drawdown_valid'),
+        CheckConstraint('max_portfolio_volatility > 0', name='ck_max_volatility_positive'),
+        CheckConstraint('target_sharpe_ratio >= 0', name='ck_target_sharpe_non_negative'),
+        CheckConstraint('max_leverage >= 1.0', name='ck_max_leverage_valid'),
+        CheckConstraint('rebalancing_frequency IN (\'daily\', \'weekly\', \'monthly\', \'quarterly\', \'annual\')', name='ck_rebalancing_frequency_valid'),
+        CheckConstraint('rebalancing_threshold > 0 AND rebalancing_threshold <= 100', name='ck_rebalancing_threshold_valid'),
+        CheckConstraint('drift_tolerance > 0 AND drift_tolerance <= 100', name='ck_drift_tolerance_valid'),
     )
 
 class RiskMetrics(BaseModel):
-    """Risk metrics calculations for portfolios"""
+    """Risk metrics model for portfolio risk analysis with PostgreSQL optimizations."""
     __tablename__ = 'risk_metrics'
     
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
+    # Foreign keys
+    risk_profile_id = Column(Integer, ForeignKey('risk_profiles.id'), nullable=False, index=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True, index=True)
+    
+    # Calculation metadata
     calculation_date = Column(DateTime, nullable=False, index=True)
+    data_start_date = Column(DateTime, nullable=False)
+    data_end_date = Column(DateTime, nullable=False)
+    lookback_days = Column(Integer, default=252, nullable=False)  # Trading days
     
-    # Value at Risk metrics
-    var_1d_95 = Column(Float, nullable=True)  # 1-day 95% VaR
-    var_1d_99 = Column(Float, nullable=True)  # 1-day 99% VaR
-    var_10d_95 = Column(Float, nullable=True)  # 10-day 95% VaR
-    cvar_1d_95 = Column(Float, nullable=True)  # 1-day 95% CVaR
-    cvar_1d_99 = Column(Float, nullable=True)  # 1-day 99% CVaR
+    # Basic risk metrics - Using Numeric for precision
+    portfolio_value = Column(Numeric(15, 2), nullable=False)
+    daily_volatility = Column(Numeric(8, 6), nullable=True)
+    annual_volatility = Column(Numeric(8, 4), nullable=True)
     
-    # Volatility metrics
-    realized_volatility = Column(Float, nullable=True)  # 30-day realized vol
-    implied_volatility = Column(Float, nullable=True)  # Portfolio implied vol
-    volatility_forecast = Column(Float, nullable=True)  # GARCH/EWMA forecast
+    # Value at Risk (VaR) metrics
+    var_1d_95 = Column(Numeric(15, 2), nullable=True)   # 1-day 95% VaR
+    var_1d_99 = Column(Numeric(15, 2), nullable=True)   # 1-day 99% VaR
+    var_10d_95 = Column(Numeric(15, 2), nullable=True)  # 10-day 95% VaR
+    var_10d_99 = Column(Numeric(15, 2), nullable=True)  # 10-day 99% VaR
     
-    # Drawdown metrics
-    current_drawdown = Column(Float, nullable=True)
-    max_drawdown_1y = Column(Float, nullable=True)
-    drawdown_duration = Column(Integer, nullable=True)  # Days in drawdown
+    # Expected Shortfall (Conditional VaR)
+    es_1d_95 = Column(Numeric(15, 2), nullable=True)    # 1-day 95% Expected Shortfall
+    es_1d_99 = Column(Numeric(15, 2), nullable=True)    # 1-day 99% Expected Shortfall
     
-    # Correlation and concentration
-    portfolio_correlation = Column(Float, nullable=True)  # Avg pairwise correlation
-    concentration_hhi = Column(Float, nullable=True)  # Herfindahl-Hirschman Index
-    effective_positions = Column(Float, nullable=True)  # 1/sum(weight^2)
+    # Drawdown analysis - Using Numeric for precision
+    current_drawdown = Column(Numeric(8, 4), default=0.0, nullable=False)
+    max_drawdown = Column(Numeric(8, 4), default=0.0, nullable=False)
+    max_drawdown_duration = Column(Integer, default=0, nullable=False)  # Days
+    high_water_mark = Column(Numeric(15, 2), nullable=False)
     
-    # Greek-like sensitivities
-    market_beta = Column(Float, nullable=True)
-    sector_exposures = Column(JSON, nullable=True)  # Sector exposure breakdown
-    factor_exposures = Column(JSON, nullable=True)  # Risk factor exposures
+    # Beta and correlation analysis
+    market_beta = Column(Numeric(8, 4), nullable=True)
+    market_correlation = Column(Numeric(8, 4), nullable=True)
+    benchmark_correlation = Column(Numeric(8, 4), nullable=True)
     
-    # Stress testing
-    stress_test_results = Column(JSON, nullable=True)  # Scenario analysis results
+    # Portfolio concentration metrics
+    concentration_hhi = Column(Numeric(8, 4), nullable=True)  # Herfindahl-Hirschman Index
+    effective_positions = Column(Numeric(8, 2), nullable=True)  # 1/HHI
+    largest_position_weight = Column(Numeric(5, 2), nullable=True)
+    top_5_concentration = Column(Numeric(5, 2), nullable=True)  # Weight of top 5 positions
+    top_10_concentration = Column(Numeric(5, 2), nullable=True) # Weight of top 10 positions
+    
+    # Sector and geographic concentration
+    sector_concentration = Column(JSONB, nullable=True)    # Sector weights and concentration
+    geographic_concentration = Column(JSONB, nullable=True) # Geographic exposure breakdown
+    
+    # Risk factor exposures
+    size_factor_exposure = Column(Numeric(8, 4), nullable=True)    # Small vs Large cap exposure
+    value_factor_exposure = Column(Numeric(8, 4), nullable=True)   # Value vs Growth exposure
+    momentum_factor_exposure = Column(Numeric(8, 4), nullable=True) # Momentum factor exposure
+    quality_factor_exposure = Column(Numeric(8, 4), nullable=True)  # Quality factor exposure
+    
+    # Liquidity risk metrics
+    avg_daily_volume_ratio = Column(Numeric(8, 4), nullable=True)  # Portfolio volume / market volume
+    liquidity_score = Column(Numeric(5, 2), nullable=True)         # Composite liquidity score (1-10)
+    days_to_liquidate = Column(Numeric(8, 2), nullable=True)       # Estimated days to liquidate 50%
+    
+    # Tail risk metrics
+    skewness = Column(Numeric(8, 4), nullable=True)
+    kurtosis = Column(Numeric(8, 4), nullable=True)
+    downside_deviation = Column(Numeric(8, 4), nullable=True)
+    upside_capture = Column(Numeric(8, 4), nullable=True)
+    downside_capture = Column(Numeric(8, 4), nullable=True)
+    
+    # Stress test results stored as JSONB
+    stress_test_results = Column(JSONB, nullable=True)  # Scenario analysis results
+    monte_carlo_results = Column(JSONB, nullable=True)  # Monte Carlo simulation results
+    
+    # Risk limit violations
+    risk_violations = Column(JSONB, nullable=True)      # List of current risk limit violations
+    warning_flags = Column(JSONB, nullable=True)        # Risk warning flags
+    
+    # Calculation metadata
+    calculation_method = Column(String(50), default='historical', nullable=False)
+    confidence_level = Column(Numeric(5, 4), default=0.95, nullable=False)
     
     # Relationships
+    risk_profile = relationship("RiskProfile", back_populates="risk_metrics")
     portfolio = relationship("Portfolio")
     
-    # Index for efficient queries
+    # Indexes for performance
     __table_args__ = (
+        Index('idx_risk_metrics_profile_date', 'risk_profile_id', 'calculation_date'),
         Index('idx_risk_metrics_portfolio_date', 'portfolio_id', 'calculation_date'),
+        Index('idx_risk_metrics_var', 'var_1d_95', 'var_1d_99'),
+        Index('idx_risk_metrics_drawdown', 'current_drawdown', 'max_drawdown'),
+        CheckConstraint('portfolio_value > 0', name='ck_portfolio_value_positive'),
+        CheckConstraint('lookback_days > 0', name='ck_lookback_days_positive'),
+        CheckConstraint('daily_volatility >= 0 OR daily_volatility IS NULL', name='ck_daily_volatility_non_negative'),
+        CheckConstraint('annual_volatility >= 0 OR annual_volatility IS NULL', name='ck_annual_volatility_non_negative'),
+        CheckConstraint('current_drawdown >= 0', name='ck_current_drawdown_non_negative'),
+        CheckConstraint('max_drawdown >= 0', name='ck_max_drawdown_non_negative'),
+        CheckConstraint('max_drawdown_duration >= 0', name='ck_max_drawdown_duration_non_negative'),
+        CheckConstraint('market_beta >= -5 AND market_beta <= 5 OR market_beta IS NULL', name='ck_market_beta_reasonable'),
+        CheckConstraint('market_correlation >= -1 AND market_correlation <= 1 OR market_correlation IS NULL', name='ck_market_correlation_valid'),
+        CheckConstraint('concentration_hhi >= 0 AND concentration_hhi <= 1 OR concentration_hhi IS NULL', name='ck_hhi_valid'),
+        CheckConstraint('largest_position_weight >= 0 AND largest_position_weight <= 100 OR largest_position_weight IS NULL', name='ck_largest_position_valid'),
+        CheckConstraint('confidence_level > 0 AND confidence_level < 1', name='ck_confidence_level_valid'),
+        CheckConstraint('calculation_method IN (\'historical\', \'parametric\', \'monte_carlo\')', name='ck_calculation_method_valid'),
+        CheckConstraint('data_end_date >= data_start_date', name='ck_data_dates_valid'),
     )
+    
+    def calculate_portfolio_beta(self, portfolio_returns, market_returns):
+        """Calculate portfolio beta against market."""
+        # This would typically use numpy/pandas for calculation
+        # Simplified implementation here
+        import numpy as np
+        if len(portfolio_returns) != len(market_returns) or len(portfolio_returns) == 0:
+            return None
+        
+        covariance = np.cov(portfolio_returns, market_returns)[0][1]
+        market_variance = np.var(market_returns)
+        
+        if market_variance == 0:
+            return None
+        
+        return covariance / market_variance
+    
+    def calculate_var(self, returns, confidence_level=0.95):
+        """Calculate Value at Risk from returns."""
+        import numpy as np
+        if len(returns) == 0:
+            return None
+        
+        percentile = (1 - confidence_level) * 100
+        return np.percentile(returns, percentile) * self.portfolio_value
+    
+    def calculate_expected_shortfall(self, returns, confidence_level=0.95):
+        """Calculate Expected Shortfall (Conditional VaR)."""
+        import numpy as np
+        if len(returns) == 0:
+            return None
+        
+        var_threshold = np.percentile(returns, (1 - confidence_level) * 100)
+        tail_returns = returns[returns <= var_threshold]
+        
+        if len(tail_returns) == 0:
+            return None
+        
+        return np.mean(tail_returns) * self.portfolio_value
+    
+class RiskLimit(BaseModel):
+    """Risk limits and thresholds."""
+    __tablename__ = 'risk_limits'
+    
+    # Foreign keys
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True, index=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Limit definition
+    limit_type = Column(String(50), nullable=False, index=True)  # MAX_POSITION_SIZE, MAX_DRAWDOWN, etc.
+    limit_value = Column(Numeric(15, 2), nullable=False)
+    limit_unit = Column(String(20), nullable=False)  # PERCENT, DOLLAR, SHARES
+    
+    # Scope
+    symbol = Column(String(20), nullable=True, index=True)  # NULL for portfolio-wide limits
+    
+    # Status
+    is_active = Column(Boolean, default=True, nullable=False)
+    
+    # Relationships
+    portfolio = relationship("Portfolio", backref="risk_limits")
+    user = relationship("User", backref="risk_limits")
+
 
 class RiskViolation(BaseModel):
-    """Risk limit violations and breaches"""
+    """Risk limit violations."""
     __tablename__ = 'risk_violations'
     
-    risk_limit_id = Column(Integer, ForeignKey('risk_limits.id'), nullable=False)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True)
+    # Foreign keys  
+    risk_limit_id = Column(Integer, ForeignKey('risk_limits.id'), nullable=False, index=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True, index=True)
     
     # Violation details
-    violation_type = Column(String(50), nullable=False)  # breach, warning, approach
-    violation_date = Column(DateTime, nullable=False, index=True)
-    current_value = Column(Float, nullable=False)
-    limit_value = Column(Float, nullable=False)
-    breach_amount = Column(Float, nullable=False)  # How much over/under limit
-    breach_percentage = Column(Float, nullable=False)  # % over/under limit
+    violation_type = Column(String(50), nullable=False, index=True)
+    violation_value = Column(Numeric(15, 2), nullable=False)
+    limit_value = Column(Numeric(15, 2), nullable=False)
+    severity = Column(String(20), default='MEDIUM', nullable=False)
     
-    # Context
-    affected_positions = Column(JSON, nullable=True)  # Positions involved
-    violation_context = Column(JSON, nullable=True)  # Additional context data
-    
-    # Resolution
+    # Status
     is_resolved = Column(Boolean, default=False, nullable=False)
     resolution_date = Column(DateTime, nullable=True)
-    resolution_action = Column(String(100), nullable=True)  # Action taken to resolve
-    resolution_notes = Column(Text, nullable=True)
-    
-    # Impact assessment
-    estimated_impact = Column(Float, nullable=True)  # Estimated P&L impact
-    actual_impact = Column(Float, nullable=True)  # Actual P&L impact
-    
-    # Notification status
-    notification_sent = Column(Boolean, default=False, nullable=False)
-    notification_method = Column(String(50), nullable=True)  # email, sms, push
-    acknowledged_by = Column(Integer, ForeignKey('users.id'), nullable=True)
-    acknowledged_at = Column(DateTime, nullable=True)
     
     # Relationships
-    risk_limit = relationship("RiskLimit", back_populates="violations")
-    portfolio = relationship("Portfolio")
-    acknowledger = relationship("User")
-    
-    # Index for efficient queries
-    __table_args__ = (
-        Index('idx_risk_violation_date_resolved', 'violation_date', 'is_resolved'),
-        Index('idx_risk_violation_portfolio', 'portfolio_id'),
-    )
+    risk_limit = relationship("RiskLimit", backref="violations")
+    portfolio = relationship("Portfolio", backref="risk_violations")
+
 
 class RiskScenario(BaseModel):
-    """Stress test scenarios for risk assessment"""
+    """Risk scenario definitions for stress testing."""
     __tablename__ = 'risk_scenarios'
     
-    name = Column(String(100), nullable=False, unique=True)
+    # Scenario identification
+    name = Column(String(200), nullable=False)
     description = Column(Text, nullable=True)
-    scenario_type = Column(String(50), nullable=False)  # historical, hypothetical, monte_carlo
+    scenario_type = Column(String(50), nullable=False, index=True)  # MARKET_CRASH, VOLATILITY_SPIKE, etc.
     
     # Scenario parameters
-    market_shock = Column(Float, nullable=True)  # Market index change %
-    volatility_shock = Column(Float, nullable=True)  # Volatility multiplier
-    correlation_shock = Column(Float, nullable=True)  # Correlation change
-    
-    # Asset-specific shocks
-    asset_shocks = Column(JSON, nullable=True)  # Symbol-specific shocks
-    sector_shocks = Column(JSON, nullable=True)  # Sector-specific shocks
-    factor_shocks = Column(JSON, nullable=True)  # Risk factor shocks
-    
-    # Scenario metadata
-    probability = Column(Float, nullable=True)  # Estimated probability
-    time_horizon = Column(Integer, default=1, nullable=False)  # Days
-    
-    # Historical reference
-    reference_date = Column(DateTime, nullable=True)  # For historical scenarios
-    reference_event = Column(String(200), nullable=True)  # Event description
+    parameters = Column(JSONB, nullable=False)  # Scenario-specific parameters
     
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
-    
-    # Relationships
-    stress_tests = relationship("StressTest", back_populates="scenario", cascade="all, delete-orphan")
+
 
 class StressTest(BaseModel):
-    """Stress test results for portfolios"""
+    """Stress test results."""
     __tablename__ = 'stress_tests'
     
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False)
-    scenario_id = Column(Integer, ForeignKey('risk_scenarios.id'), nullable=False)
-    test_date = Column(DateTime, nullable=False, index=True)
+    # Foreign keys
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=False, index=True)
+    risk_scenario_id = Column(Integer, ForeignKey('risk_scenarios.id'), nullable=False, index=True)
     
     # Test results
-    base_portfolio_value = Column(Float, nullable=False)
-    stressed_portfolio_value = Column(Float, nullable=False)
-    absolute_loss = Column(Float, nullable=False)
-    percentage_loss = Column(Float, nullable=False)
+    portfolio_value_change = Column(Numeric(15, 2), nullable=False)
+    portfolio_value_change_pct = Column(Numeric(8, 4), nullable=False)
+    max_loss = Column(Numeric(15, 2), nullable=False)
     
-    # Position-level impacts
-    position_impacts = Column(JSON, nullable=True)  # Impact by position
-    sector_impacts = Column(JSON, nullable=True)  # Impact by sector
-    
-    # Risk metrics under stress
-    stressed_var = Column(Float, nullable=True)
-    stressed_volatility = Column(Float, nullable=True)
-    stressed_correlation = Column(Float, nullable=True)
-    
-    # Liquidity impact
-    liquidity_cost = Column(Float, nullable=True)  # Cost to liquidate
-    liquidation_time = Column(Integer, nullable=True)  # Days to liquidate
+    # Test metadata
+    test_date = Column(DateTime, default=datetime.utcnow, nullable=False)
+    detailed_results = Column(JSONB, nullable=True)
     
     # Relationships
-    portfolio = relationship("Portfolio")
-    scenario = relationship("RiskScenario", back_populates="stress_tests")
-    
-    # Index for efficient queries
-    __table_args__ = (
-        Index('idx_stress_test_portfolio_date', 'portfolio_id', 'test_date'),
-    )
+    portfolio = relationship("Portfolio", backref="stress_tests")
+    risk_scenario = relationship("RiskScenario", backref="stress_tests")
+
 
 class PositionRisk(BaseModel):
-    """Risk metrics for individual positions"""
+    """Individual position risk metrics."""
     __tablename__ = 'position_risk'
     
-    position_id = Column(Integer, ForeignKey('positions.id'), nullable=False)
-    calculation_date = Column(DateTime, nullable=False, index=True)
+    # Foreign key
+    position_id = Column(Integer, ForeignKey('positions.id'), nullable=False, unique=True, index=True)
     
-    # Basic risk metrics
-    position_var = Column(Float, nullable=True)  # Position VaR
-    position_volatility = Column(Float, nullable=True)  # Historical volatility
-    beta_to_market = Column(Float, nullable=True)  # Market beta
+    # Risk metrics
+    var_1d = Column(Numeric(15, 2), nullable=True)  # 1-day Value at Risk
+    var_5d = Column(Numeric(15, 2), nullable=True)  # 5-day Value at Risk
+    beta = Column(Numeric(8, 4), nullable=True)
+    correlation_to_market = Column(Numeric(8, 4), nullable=True)
     
     # Concentration risk
-    portfolio_weight = Column(Float, nullable=False)
-    risk_contribution = Column(Float, nullable=True)  # % of portfolio risk
-    marginal_var = Column(Float, nullable=True)  # Marginal VaR
-    component_var = Column(Float, nullable=True)  # Component VaR
+    portfolio_weight = Column(Numeric(8, 4), nullable=False)
+    sector_concentration = Column(Numeric(8, 4), nullable=True)
     
-    # Correlation metrics
-    correlation_to_portfolio = Column(Float, nullable=True)
-    avg_correlation = Column(Float, nullable=True)  # Avg correlation to other positions
-    max_correlation = Column(Float, nullable=True)  # Max correlation to any position
-    
-    # Liquidity risk
-    avg_daily_volume = Column(Float, nullable=True)  # 30-day avg volume
-    volume_ratio = Column(Float, nullable=True)  # Position size / avg volume
-    bid_ask_spread = Column(Float, nullable=True)  # Current spread
-    liquidity_score = Column(Float, nullable=True)  # 0-100 liquidity score
-    
-    # Event risk
-    earnings_date = Column(DateTime, nullable=True)  # Next earnings
-    dividend_date = Column(DateTime, nullable=True)  # Next dividend
-    events_risk_score = Column(Float, nullable=True)  # 0-100 event risk
-    
-    # Technical risk indicators
-    rsi = Column(Float, nullable=True)  # Relative Strength Index
-    volatility_percentile = Column(Float, nullable=True)  # Current vol vs historical
-    momentum_score = Column(Float, nullable=True)  # Price momentum
+    # Last updated
+    last_calculation = Column(DateTime, default=datetime.utcnow, nullable=False)
     
     # Relationships
-    position = relationship("Position")
-    
-    # Index for efficient queries
-    __table_args__ = (
-        Index('idx_position_risk_date', 'position_id', 'calculation_date'),
-    )
+    position = relationship("Position", backref="risk_metrics")
+
 
 class RiskAlert(BaseModel):
-    """Risk alerts and notifications"""
+    """Risk alerts and notifications."""
     __tablename__ = 'risk_alerts'
     
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True)
+    # Foreign keys
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    portfolio_id = Column(Integer, ForeignKey('portfolios.id'), nullable=True, index=True)
     
     # Alert details
-    alert_type = Column(String(50), nullable=False)  # limit_breach, high_risk, correlation, etc.
-    severity = Column(String(20), nullable=False)  # low, medium, high, critical
-    title = Column(String(200), nullable=False)
+    alert_type = Column(String(50), nullable=False, index=True)
+    severity = Column(String(20), nullable=False, index=True)
     message = Column(Text, nullable=False)
     
-    # Alert triggers
-    trigger_value = Column(Float, nullable=True)
-    threshold_value = Column(Float, nullable=True)
-    trigger_condition = Column(String(50), nullable=True)  # greater_than, less_than, equals
+    # Alert data
+    alert_data = Column(JSONB, nullable=True)  # Additional alert context
     
-    # Alert metadata
-    alert_date = Column(DateTime, nullable=False, index=True)
-    expiry_date = Column(DateTime, nullable=True)
-    
-    # Status tracking
+    # Status
     is_acknowledged = Column(Boolean, default=False, nullable=False)
     acknowledged_at = Column(DateTime, nullable=True)
-    acknowledged_by = Column(Integer, ForeignKey('users.id'), nullable=True)
-    
-    # Notification tracking
-    notification_sent = Column(Boolean, default=False, nullable=False)
-    notification_methods = Column(JSON, nullable=True)  # List of notification methods used
-    
-    # Resolution
-    is_resolved = Column(Boolean, default=False, nullable=False)
-    resolved_at = Column(DateTime, nullable=True)
-    resolution_notes = Column(Text, nullable=True)
-    
-    # Additional context
-    related_data = Column(JSON, nullable=True)  # Additional context data
     
     # Relationships
-    user = relationship("User")
-    portfolio = relationship("Portfolio")
-    acknowledger = relationship("User", foreign_keys=[acknowledged_by])
-    
-    # Index for efficient queries
-    __table_args__ = (
-        Index('idx_risk_alert_user_date', 'user_id', 'alert_date'),
-        Index('idx_risk_alert_severity_resolved', 'severity', 'is_resolved'),
-    )
+    user = relationship("User", backref="risk_alerts")
+    portfolio = relationship("Portfolio", backref="risk_alerts")
+
 
 class RiskModelConfiguration(BaseModel):
-    """Configuration for risk models and calculations"""
+    """Risk model configuration and parameters."""
     __tablename__ = 'risk_model_configurations'
     
-    name = Column(String(100), nullable=False, unique=True)
-    description = Column(Text, nullable=True)
-    model_type = Column(String(50), nullable=False)  # var, stress_test, correlation, etc.
+    # Configuration identification
+    name = Column(String(200), nullable=False)
+    model_type = Column(String(50), nullable=False, index=True)  # VAR, MONTE_CARLO, etc.
+    version = Column(String(20), default='1.0', nullable=False)
     
-    # Model parameters
-    lookback_period = Column(Integer, nullable=False)  # Days of historical data
-    confidence_level = Column(Float, nullable=False)  # For VaR calculations
-    decay_factor = Column(Float, nullable=True)  # For EWMA models
-    
-    # Calculation settings
-    calculation_frequency = Column(String(20), nullable=False)  # daily, weekly, monthly
-    auto_update = Column(Boolean, default=True, nullable=False)
-    
-    # Model configuration
-    model_parameters = Column(JSON, nullable=True)  # Model-specific parameters
+    # Configuration parameters
+    parameters = Column(JSONB, nullable=False)  # Model-specific parameters
     
     # Status
     is_active = Column(Boolean, default=True, nullable=False)
-    last_calibration = Column(DateTime, nullable=True)
-    next_calibration = Column(DateTime, nullable=True)
-    
-    # Performance tracking
-    model_accuracy = Column(Float, nullable=True)  # Backtesting accuracy
-    last_validation = Column(DateTime, nullable=True)
-    
-    def to_dict(self):
-        """Convert to dictionary with JSON parsing"""
-        data = super().to_dict()
-        if self.model_parameters:
-            data['model_parameters'] = json.loads(self.model_parameters) if isinstance(self.model_parameters, str) else self.model_parameters
-        return data
+    is_default = Column(Boolean, default=False, nullable=False)

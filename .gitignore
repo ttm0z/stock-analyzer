@@ -1,3 +1,45 @@
-venv
+# Python Virtual Environment
+venv/
+env/
+ENV/
+
+# Environment Files
+.env
+.env.*
 backend/.env
-frontend/node_modules
+backend/.env.*
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build outputs
+dist/
+build/
+*.tgz
+*.tar.gz
+
+# Editor files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+.Spotlight-V100
+.Trashes
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+.tmp/

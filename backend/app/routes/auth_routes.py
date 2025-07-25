@@ -2,7 +2,7 @@
 Authentication routes
 """
 from flask import Blueprint, request, jsonify, current_app
-from ..db import db
+from ..database import get_db_session, db_session_scope
 from ..auth.models import User, APIKey
 from ..auth.decorators import token_required, admin_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
@@ -40,10 +40,11 @@ def register():
             raise ValidationError("Password must be at least 8 characters")
         
         # Check if user already exists
-        if User.query.filter_by(email=email).first():
+        session = get_db_session()
+        if session.query(User).filter_by(email=email).first():
             return jsonify({'error': 'Email already registered'}), 409
         
-        if User.query.filter_by(username=username).first():
+        if session.query(User).filter_by(username=username).first():
             return jsonify({'error': 'Username already taken'}), 409
         
         # Create new user
@@ -55,8 +56,8 @@ def register():
             last_name=last_name or None
         )
         
-        db.session.add(user)
-        db.session.commit()
+        session.add(user)
+        session.commit()
         
         # Generate JWT token (8 hours for paper trading app)
         token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
@@ -93,11 +94,12 @@ def login():
             return jsonify({'error': 'Email/username and password are required'}), 400
         
         # Find user by email or username
+        session = get_db_session()
         user = None
         if '@' in email_or_username:
-            user = User.query.filter_by(email=email_or_username).first()
+            user = session.query(User).filter_by(email=email_or_username).first()
         else:
-            user = User.query.filter_by(username=email_or_username).first()
+            user = session.query(User).filter_by(username=email_or_username).first()
         
         if not user or not user.check_password(password):
             return jsonify({'error': 'Invalid credentials'}), 401
@@ -107,6 +109,7 @@ def login():
         
         # Update last login
         user.update_last_login()
+        session.commit()
         
         # Generate JWT token (8 hours for paper trading app)
         token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
@@ -157,11 +160,13 @@ def update_profile():
         if 'email' in data:
             new_email = data['email'].strip().lower()
             if new_email != user.email:
-                if User.query.filter_by(email=new_email).first():
+                session = get_db_session()
+                if session.query(User).filter_by(email=new_email).first():
                     return jsonify({'error': 'Email already in use'}), 409
                 user.email = new_email
         
-        db.session.commit()
+        session = get_db_session()
+        session.commit()
         
         return jsonify({
             'message': 'Profile updated successfully',
@@ -202,7 +207,8 @@ def change_password():
         
         # Update password
         user.set_password(new_password)
-        db.session.commit()
+        session = get_db_session()
+        session.commit()
         
         logger.info(f"Password changed for user: {user.email}")
         
@@ -218,7 +224,8 @@ def get_api_keys():
     """Get user's API keys"""
     from flask import g
     
-    api_keys = APIKey.query.filter_by(user_id=g.current_user.id).all()
+    session = get_db_session()
+    api_keys = session.query(APIKey).filter_by(user_id=g.current_user.id).all()
     
     return jsonify({
         'api_keys': [key.to_dict() for key in api_keys]
@@ -250,8 +257,9 @@ def create_api_key():
             name=name
         )
         
-        db.session.add(api_key)
-        db.session.commit()
+        session = get_db_session()
+        session.add(api_key)
+        session.commit()
         
         logger.info(f"API key created for user: {g.current_user.email}")
         
@@ -274,7 +282,8 @@ def delete_api_key(key_id):
     from flask import g
     
     try:
-        api_key = APIKey.query.filter_by(
+        session = get_db_session()
+        api_key = session.query(APIKey).filter_by(
             id=key_id, 
             user_id=g.current_user.id
         ).first()
@@ -282,8 +291,8 @@ def delete_api_key(key_id):
         if not api_key:
             return jsonify({'error': 'API key not found'}), 404
         
-        db.session.delete(api_key)
-        db.session.commit()
+        session.delete(api_key)
+        session.commit()
         
         logger.info(f"API key deleted for user: {g.current_user.email}")
         

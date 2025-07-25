@@ -1,41 +1,44 @@
 """
 Authentication models
 """
-from flask_sqlalchemy import SQLAlchemy
 from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import jwt
 import os
-from ..db import db
+from ..models.base import Base, BaseModel
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
+from sqlalchemy.orm import relationship
 
-class User(db.Model):
+class User(BaseModel):
     """User model for authentication"""
     __tablename__ = 'users'
     
-    id = db.Column(db.Integer, primary_key=True)
-    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
-    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
-    password_hash = db.Column(db.String(255), nullable=False)
+    email = Column(String(255), unique=True, nullable=False, index=True)
+    username = Column(String(80), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
     
     # User status
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
-    is_verified = db.Column(db.Boolean, default=False, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
+    is_verified = Column(Boolean, default=False, nullable=False)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_login = db.Column(db.DateTime, nullable=True)
+    last_login = Column(DateTime, nullable=True)
     
     # Profile info
-    first_name = db.Column(db.String(50), nullable=True)
-    last_name = db.Column(db.String(50), nullable=True)
+    first_name = Column(String(50), nullable=True)
+    last_name = Column(String(50), nullable=True)
     
-    # Preferences and settings
-    preferences = db.Column(db.Text, nullable=True)
-    deactivated_at = db.Column(db.DateTime, nullable=True)
-    deactivation_reason = db.Column(db.Text, nullable=True)
+    # Preferences and settings (legacy JSON field)
+    preferences = Column(Text, nullable=True)  # Keep original column name
+    deactivated_at = Column(DateTime, nullable=True)
+    deactivation_reason = Column(Text, nullable=True)
     
-    # Relationships
-    portfolios = db.relationship("Portfolio", back_populates="user", lazy='dynamic')
+    # Relationships - using string references to avoid circular imports
+    portfolios = relationship("Portfolio", back_populates="user", lazy='dynamic')
+    strategies = relationship("Strategy", back_populates="user", lazy='dynamic')
+    user_preferences = relationship("UserPreferences", back_populates="user", uselist=False)
+    risk_profiles = relationship("RiskProfile", back_populates="user", lazy='dynamic')
+    api_keys = relationship("APIKey", back_populates="user", lazy='dynamic')
     
     def __init__(self, email, username, password, first_name=None, last_name=None):
         self.email = email.lower().strip()
@@ -85,7 +88,7 @@ class User(db.Model):
             return None
     
     @staticmethod
-    def decode_jwt_token(token):
+    def decode_jwt_token(token, session):
         """Decode JWT token and return user"""
         try:
             payload = jwt.decode(
@@ -93,14 +96,14 @@ class User(db.Model):
                 os.getenv('JWT_SECRET_KEY'),
                 algorithms=['HS256']
             )
-            return User.query.get(payload['user_id'])
+            return session.query(User).get(payload['user_id'])
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             return None
     
     def update_last_login(self):
         """Update last login timestamp"""
         self.last_login = datetime.utcnow()
-        db.session.commit()
+        # Note: Session commit should be handled by the calling code
     
     def to_dict(self):
         """Convert user to dictionary (exclude sensitive data)"""
@@ -119,28 +122,26 @@ class User(db.Model):
     def __repr__(self):
         return f'<User {self.username}>'
 
-class APIKey(db.Model):
+class APIKey(BaseModel):
     """API Key model for API access"""
     __tablename__ = 'api_keys'
     
-    id = db.Column(db.Integer, primary_key=True)
-    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    key_hash = db.Column(db.String(255), nullable=False, unique=True)
-    name = db.Column(db.String(100), nullable=False)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
+    key_hash = Column(String(255), nullable=False, unique=True)
+    name = Column(String(100), nullable=False)
     
     # Key status
-    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_active = Column(Boolean, default=True, nullable=False)
     
     # Timestamps
-    created_at = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
-    last_used = db.Column(db.DateTime, nullable=True)
-    expires_at = db.Column(db.DateTime, nullable=True)
+    last_used = Column(DateTime, nullable=True)
+    expires_at = Column(DateTime, nullable=True)
     
     # Usage tracking
-    usage_count = db.Column(db.Integer, default=0, nullable=False)
+    usage_count = Column(Integer, default=0, nullable=False)
     
     # Relationships
-    user = db.relationship('User', backref='api_keys')
+    user = relationship('User', back_populates='api_keys')
     
     def __init__(self, user_id, raw_key, name, expires_at=None):
         self.user_id = user_id
@@ -166,7 +167,7 @@ class APIKey(db.Model):
         """Record API key usage"""
         self.last_used = datetime.utcnow()
         self.usage_count += 1
-        db.session.commit()
+        # Note: Session commit should be handled by the calling code
     
     def to_dict(self):
         """Convert API key to dictionary (exclude sensitive data)"""

@@ -90,8 +90,8 @@ class StrategyRegistry:
                 return False
             
             # Remove from categories
-            metadata = self.strategy_metadata.get(strategy_name, {})
-            category = metadata.get('category')
+            additional_metadata = self.strategy_metadata.get(strategy_name, {})
+            category = additional_metadata.get('category')
             if category and category in self.categories:
                 if strategy_name in self.categories[category]:
                     self.categories[category].remove(strategy_name)
@@ -171,17 +171,17 @@ class StrategyRegistry:
             return None
         
         strategy_class = self.strategies[strategy_name]
-        metadata = self.strategy_metadata[strategy_name]
+        additional_metadata = self.strategy_metadata[strategy_name]
         
         return {
             'name': strategy_name,
             'class': strategy_class.__name__,
             'module': strategy_class.__module__,
-            'description': metadata.get('description', ''),
-            'category': metadata.get('category', 'unknown'),
-            'parameters': metadata.get('parameters', {}),
-            'version': metadata.get('version', '1.0.0'),
-            'is_builtin': metadata.get('category') in ['trend', 'mean_reversion', 'momentum', 'arbitrage'],
+            'description': additional_metadata.get('description', ''),
+            'category': additional_metadata.get('category', 'unknown'),
+            'parameters': additional_metadata.get('parameters', {}),
+            'version': additional_metadata.get('version', '1.0.0'),
+            'is_builtin': additional_metadata.get('category') in ['trend', 'mean_reversion', 'momentum', 'arbitrage'],
             'dependencies': self._get_strategy_dependencies(strategy_class)
         }
     
@@ -202,8 +202,8 @@ class StrategyRegistry:
                 return result
             
             # Get expected parameters
-            metadata = self.strategy_metadata.get(strategy_name, {})
-            expected_params = metadata.get('parameters', {})
+            additional_metadata = self.strategy_metadata.get(strategy_name, {})
+            expected_params = additional_metadata.get('parameters', {})
             
             # Check required parameters
             for param_name, param_info in expected_params.items():

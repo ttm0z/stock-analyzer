@@ -81,11 +81,20 @@ httpClient.interceptors.response.use(
           return Promise.reject(new Error('Session expired. Please log in again.'));
         }
 
-        // Attempt to refresh token
-        const response = await axios.post(`${config.API_BASE_URL}/auth/refresh`, {
+        // Attempt to refresh token - use a new axios instance to avoid interceptor loops
+        const refreshClient = axios.create({
+          baseURL: config.API_BASE_URL,
+          timeout: config.API_TIMEOUT,
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          withCredentials: true,
+        });
+        
+        const response = await refreshClient.post('/auth/refresh', {
           refresh_token: refreshToken
         });
-
+        console.log("Response: ", response)
         const { token, access_token, refresh_token: newRefreshToken } = response.data;
         const newToken = token || access_token;
 

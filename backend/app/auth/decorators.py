@@ -4,6 +4,7 @@ Authentication decorators and utilities
 from functools import wraps
 from flask import request, jsonify, current_app, g
 from .models import User, APIKey
+from ..database import get_db_session
 import logging
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,8 @@ def token_required(f):
         
         try:
             # Decode the token
-            current_user = User.decode_jwt_token(token)
+            session = get_db_session()
+            current_user = User.decode_jwt_token(token, session)
             if not current_user:
                 return jsonify({'error': 'Token is invalid or expired'}), 401
             
@@ -62,8 +64,9 @@ def api_key_required(f):
         
         try:
             # Find and validate API key
+            session = get_db_session()
             api_key_obj = None
-            for key_obj in APIKey.query.filter_by(is_active=True).all():
+            for key_obj in session.query(APIKey).filter_by(is_active=True).all():
                 if key_obj.check_key(api_key):
                     api_key_obj = key_obj
                     break

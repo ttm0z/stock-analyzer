@@ -1,11 +1,11 @@
 """
 Portfolio Management API routes
 """
-from flask import Blueprint, request, jsonify, current_app
-from ..db import db
+from flask import Blueprint, request, jsonify, current_app, g
 from ..models.portfolio_models import Portfolio, Position, Transaction
 from ..auth.decorators import token_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
+from ..database import get_db_session
 import logging
 from datetime import datetime
 
@@ -57,8 +57,9 @@ def create_portfolio():
             currency=data.get('currency', 'USD')
         )
         
-        db.session.add(portfolio)
-        db.session.commit()
+        session = get_db_session()
+        session.add(portfolio)
+        session.commit()
         
         logger.info(f"Portfolio created: {portfolio.name} for user {g.current_user.id}")
         
@@ -98,8 +99,9 @@ def get_portfolios():
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query
-        query = Portfolio.query.filter_by(user_id=g.current_user.id)
+        # Build query using session
+        session = get_db_session()
+        query = session.query(Portfolio).filter_by(user_id=g.current_user.id)
         
         # Apply filters
         if portfolio_type:
@@ -158,7 +160,8 @@ def get_portfolio_details(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -237,7 +240,8 @@ def update_portfolio(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -256,7 +260,7 @@ def update_portfolio(portfolio_id):
             portfolio.is_active = bool(data['is_active'])
         
         portfolio.last_updated = datetime.utcnow()
-        db.session.commit()
+        session.commit()
         
         logger.info(f"Portfolio updated: ID {portfolio_id}")
         
@@ -291,7 +295,8 @@ def delete_portfolio(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -308,8 +313,8 @@ def delete_portfolio(portfolio_id):
             }), 400
         
         # Delete portfolio (cascade will handle related records)
-        db.session.delete(portfolio)
-        db.session.commit()
+        session.delete(portfolio)
+        session.commit()
         
         logger.info(f"Portfolio deleted: ID {portfolio_id}")
         
@@ -328,7 +333,8 @@ def get_portfolio_positions(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -391,7 +397,8 @@ def get_portfolio_performance(portfolio_id):
     
     try:
         # Find portfolio
-        portfolio = Portfolio.query.filter_by(
+        session = get_db_session()
+        portfolio = session.query(Portfolio).filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()

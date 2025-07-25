@@ -1,8 +1,8 @@
 """
 Strategy Management API routes
 """
-from flask import Blueprint, request, jsonify, current_app
-from ..db import db
+from flask import Blueprint, request, jsonify, current_app, g
+from ..database import get_db_session
 from ..auth.decorators import token_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
 from ..services.strategies.strategy_registry import StrategyRegistry
@@ -191,7 +191,8 @@ def run_strategy():
         # Get portfolio if specified
         portfolio = None
         if portfolio_id:
-            portfolio = Portfolio.query.filter_by(
+            session = get_db_session()
+            portfolio = session.query(Portfolio).filter_by(
                 id=portfolio_id,
                 user_id=g.current_user.id
             ).first()
