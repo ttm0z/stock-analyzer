@@ -13,11 +13,15 @@ import Portfolios from './components/portfolios/Portfolios';
 import PortfolioDetail from './components/portfolios/PortfolioDetail';
 import Trades from './components/trades/Trades';
 import Strategies from './components/strategies/Strategies';
+import CreateStrategy from './components/strategies/CreateStrategy';
+import StrategyDetail from './components/strategies/StrategyDetail';
 import Backtests from './components/backtests/Backtests';
 import Research from './components/research/Research';
 import MarketOverview from './components/market/MarketOverview';
 import Settings from './components/settings/Settings';
 import './App.css'
+import CreateBacktest from './components/backtests/CreateBacktest';
+import BacktestDetail from './components/backtests/BacktestDetail';
 
 function AppLayout({ children }) {
   return (
@@ -108,6 +112,22 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/strategies/new" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <CreateStrategy />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      
+      <Route path="/strategies/:strategyId" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <StrategyDetail />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      
       <Route path="/backtests" element={
         <ProtectedRoute>
           <AppLayout>
@@ -116,6 +136,20 @@ function AppRoutes() {
         </ProtectedRoute>
       } />
       
+      <Route path="/backtests/new" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <CreateBacktest />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
+      <Route path="/backtests/:backtestId" element={
+        <ProtectedRoute>
+          <AppLayout>
+            <BacktestDetail />
+          </AppLayout>
+        </ProtectedRoute>
+      } />
       <Route path="/research" element={
         <ProtectedRoute>
           <AppLayout>

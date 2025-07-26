@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, current_app, g
 from ..models.portfolio_models import Portfolio, Position, Transaction
 from ..auth.decorators import token_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
-from ..database import get_db_session
+from ..db import db
 import logging
 from datetime import datetime
 
@@ -57,9 +57,13 @@ def create_portfolio():
             currency=data.get('currency', 'USD')
         )
         
-        session = get_db_session()
-        session.add(portfolio)
-        session.commit()
+        try:
+            db.session.add(portfolio)
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            logger.error(f"Database error during portfolio creation: {db_error}")
+            return jsonify({'error': 'Failed to create portfolio'}), 500
         
         logger.info(f"Portfolio created: {portfolio.name} for user {g.current_user.id}")
         
@@ -82,6 +86,7 @@ def create_portfolio():
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Portfolio creation error: {e}")
         return jsonify({'error': 'Failed to create portfolio'}), 500
 
@@ -99,9 +104,8 @@ def get_portfolios():
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query using session
-        session = get_db_session()
-        query = session.query(Portfolio).filter_by(user_id=g.current_user.id)
+        # Build query
+        query = Portfolio.query.filter_by(user_id=g.current_user.id)
         
         # Apply filters
         if portfolio_type:
@@ -160,8 +164,7 @@ def get_portfolio_details(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -240,8 +243,7 @@ def update_portfolio(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -260,7 +262,12 @@ def update_portfolio(portfolio_id):
             portfolio.is_active = bool(data['is_active'])
         
         portfolio.last_updated = datetime.utcnow()
-        session.commit()
+        try:
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            logger.error(f"Database error during portfolio update: {db_error}")
+            return jsonify({'error': 'Failed to update portfolio'}), 500
         
         logger.info(f"Portfolio updated: ID {portfolio_id}")
         
@@ -283,6 +290,7 @@ def update_portfolio(portfolio_id):
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Portfolio update error: {e}")
         return jsonify({'error': 'Failed to update portfolio'}), 500
 
@@ -295,8 +303,7 @@ def delete_portfolio(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -313,14 +320,20 @@ def delete_portfolio(portfolio_id):
             }), 400
         
         # Delete portfolio (cascade will handle related records)
-        session.delete(portfolio)
-        session.commit()
+        try:
+            db.session.delete(portfolio)
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            logger.error(f"Database error during portfolio deletion: {db_error}")
+            return jsonify({'error': 'Failed to delete portfolio'}), 500
         
         logger.info(f"Portfolio deleted: ID {portfolio_id}")
         
         return jsonify({'message': 'Portfolio deleted successfully'}), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Portfolio deletion error: {e}")
         return jsonify({'error': 'Failed to delete portfolio'}), 500
 
@@ -333,8 +346,7 @@ def get_portfolio_positions(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()
@@ -397,8 +409,7 @@ def get_portfolio_performance(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id, 
             user_id=g.current_user.id
         ).first()

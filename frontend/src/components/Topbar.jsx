@@ -25,7 +25,7 @@ function Topbar() {
         
         <div className="flex items-center space-x-4">
           {/* Notifications */}
-          <button className="p-2 text-gray-400 hover:text-gray-500">
+          <button className="p-2 text-gray-700 bg-gray-100 border-2 border-gray-300 hover:text-gray-900 hover:bg-gray-200 hover:border-gray-400 rounded-lg shadow-sm transition-all duration-200 transform hover:scale-105">
             <Bell className="h-5 w-5" />
           </button>
           

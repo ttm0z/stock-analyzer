@@ -2,7 +2,7 @@
 Authentication routes
 """
 from flask import Blueprint, request, jsonify, current_app
-from ..database import get_db_session, db_session_scope
+from ..db import db
 from ..auth.models import User, APIKey
 from ..auth.decorators import token_required, admin_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
@@ -40,11 +40,10 @@ def register():
             raise ValidationError("Password must be at least 8 characters")
         
         # Check if user already exists
-        session = get_db_session()
-        if session.query(User).filter_by(email=email).first():
+        if User.query.filter_by(email=email).first():
             return jsonify({'error': 'Email already registered'}), 409
         
-        if session.query(User).filter_by(username=username).first():
+        if User.query.filter_by(username=username).first():
             return jsonify({'error': 'Username already taken'}), 409
         
         # Create new user
@@ -56,23 +55,29 @@ def register():
             last_name=last_name or None
         )
         
-        session.add(user)
-        session.commit()
-        
-        # Generate JWT token (8 hours for paper trading app)
-        token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
-        print(f"Generated token for new user {email}: {token}")
-        logger.info(f"New user registered: {email}, token generated: {token is not None}")
-        
-        return jsonify({
-            'message': 'User registered successfully',
-            'user': user.to_dict(),
-            'token': token
-        }), 201
+        try:
+            db.session.add(user)
+            db.session.commit()
+            
+            # Generate JWT token (8 hours for paper trading app)
+            token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
+            print(f"Generated token for new user {email}: {token}")
+            logger.info(f"New user registered: {email}, token generated: {token is not None}")
+            
+            return jsonify({
+                'message': 'User registered successfully',
+                'user': user.to_dict(),
+                'token': token
+            }), 201
+        except Exception as db_e:
+            db.session.rollback()
+            logger.error(f"Database error during registration: {db_e}")
+            raise ValidationError("Registration failed due to database error")
         
     except ValidationError as e:
         return jsonify({'error': str(e)}), 400
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Registration error: {e}")
         return jsonify({'error': 'Registration failed'}), 500
 
@@ -94,12 +99,11 @@ def login():
             return jsonify({'error': 'Email/username and password are required'}), 400
         
         # Find user by email or username
-        session = get_db_session()
         user = None
         if '@' in email_or_username:
-            user = session.query(User).filter_by(email=email_or_username).first()
+            user = User.query.filter_by(email=email_or_username).first()
         else:
-            user = session.query(User).filter_by(username=email_or_username).first()
+            user = User.query.filter_by(username=email_or_username).first()
         
         if not user or not user.check_password(password):
             return jsonify({'error': 'Invalid credentials'}), 401
@@ -109,7 +113,11 @@ def login():
         
         # Update last login
         user.update_last_login()
-        session.commit()
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Error updating last login: {e}")
         
         # Generate JWT token (8 hours for paper trading app)
         token = user.generate_jwt_token(expires_in=28800)  # 8 hours in seconds
@@ -123,6 +131,7 @@ def login():
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Login error: {e}")
         return jsonify({'error': 'Login failed'}), 500
 
@@ -160,13 +169,16 @@ def update_profile():
         if 'email' in data:
             new_email = data['email'].strip().lower()
             if new_email != user.email:
-                session = get_db_session()
-                if session.query(User).filter_by(email=new_email).first():
+                if User.query.filter_by(email=new_email).first():
                     return jsonify({'error': 'Email already in use'}), 409
                 user.email = new_email
         
-        session = get_db_session()
-        session.commit()
+        try:
+            db.session.commit()
+        except Exception as db_e:
+            db.session.rollback()
+            logger.error(f"Database error during profile update: {db_e}")
+            return jsonify({'error': 'Profile update failed due to database error'}), 500
         
         return jsonify({
             'message': 'Profile updated successfully',
@@ -174,6 +186,7 @@ def update_profile():
         }), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Profile update error: {e}")
         return jsonify({'error': 'Profile update failed'}), 500
 
@@ -207,14 +220,19 @@ def change_password():
         
         # Update password
         user.set_password(new_password)
-        session = get_db_session()
-        session.commit()
+        try:
+            db.session.commit()
+        except Exception as db_e:
+            db.session.rollback()
+            logger.error(f"Database error during password change: {db_e}")
+            return jsonify({'error': 'Password change failed due to database error'}), 500
         
         logger.info(f"Password changed for user: {user.email}")
         
         return jsonify({'message': 'Password changed successfully'}), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Password change error: {e}")
         return jsonify({'error': 'Password change failed'}), 500
 
@@ -224,8 +242,7 @@ def get_api_keys():
     """Get user's API keys"""
     from flask import g
     
-    session = get_db_session()
-    api_keys = session.query(APIKey).filter_by(user_id=g.current_user.id).all()
+    api_keys = APIKey.query.filter_by(user_id=g.current_user.id).all()
     
     return jsonify({
         'api_keys': [key.to_dict() for key in api_keys]
@@ -257,9 +274,13 @@ def create_api_key():
             name=name
         )
         
-        session = get_db_session()
-        session.add(api_key)
-        session.commit()
+        try:
+            db.session.add(api_key)
+            db.session.commit()
+        except Exception as db_e:
+            db.session.rollback()
+            logger.error(f"Database error during API key creation: {db_e}")
+            return jsonify({'error': 'API key creation failed due to database error'}), 500
         
         logger.info(f"API key created for user: {g.current_user.email}")
         
@@ -272,6 +293,7 @@ def create_api_key():
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"API key creation error: {e}")
         return jsonify({'error': 'API key creation failed'}), 500
 
@@ -282,8 +304,7 @@ def delete_api_key(key_id):
     from flask import g
     
     try:
-        session = get_db_session()
-        api_key = session.query(APIKey).filter_by(
+        api_key = APIKey.query.filter_by(
             id=key_id, 
             user_id=g.current_user.id
         ).first()
@@ -291,13 +312,19 @@ def delete_api_key(key_id):
         if not api_key:
             return jsonify({'error': 'API key not found'}), 404
         
-        session.delete(api_key)
-        session.commit()
+        try:
+            db.session.delete(api_key)
+            db.session.commit()
+        except Exception as db_e:
+            db.session.rollback()
+            logger.error(f"Database error during API key deletion: {db_e}")
+            return jsonify({'error': 'API key deletion failed due to database error'}), 500
         
         logger.info(f"API key deleted for user: {g.current_user.email}")
         
         return jsonify({'message': 'API key deleted successfully'}), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"API key deletion error: {e}")
         return jsonify({'error': 'API key deletion failed'}), 500

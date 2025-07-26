@@ -31,7 +31,7 @@ def create_backtest():
     from flask import g
     
     data = request.get_json()
-    
+    print(data)
     if not data:
         return jsonify({'error': 'No JSON data provided'}), 400
     
@@ -90,23 +90,29 @@ def create_backtest():
         benchmark_symbol = data.get('benchmark_symbol', 'SPY')
         
         # Create backtest record
-        backtest = Backtest(
-            user_id=g.current_user.id,
-            strategy_id=1,  # We'll use a fixed strategy_id for now since strategies table doesn't exist
-            name=data['name'].strip(),
-            description=data.get('description'),
-            start_date=start_date,
-            end_date=end_date,
-            initial_capital=initial_capital,
-            commission_rate=commission_rate,
-            slippage_rate=slippage_rate,
-            benchmark_symbol=benchmark_symbol,
-            strategy_parameters=json.dumps(strategy_parameters) if strategy_parameters else None,
-            status='pending'
-        )
+        try:
+            backtest = Backtest(
+                user_id=g.current_user.id,
+                strategy_id=1,  # We'll use a fixed strategy_id for now since strategies table doesn't exist
+                name=data['name'].strip(),
+                description=data.get('description'),
+                start_date=start_date,
+                end_date=end_date,
+                initial_capital=initial_capital,
+                universe=validated_universe,
+                commission_rate=commission_rate,
+                slippage_rate=slippage_rate,
+                benchmark_symbol=benchmark_symbol,
+                parameters=strategy_parameters,
+                status='pending'
+            )
         
-        db.session.add(backtest)
-        db.session.commit()
+            db.session.add(backtest)
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            logger.error(f"Database error during backtest creation: {db_error}")
+            return jsonify({'error': 'Failed to create backtest'}), 500
         
         # Start backtest in background thread
         backtest_thread = threading.Thread(
@@ -135,6 +141,7 @@ def create_backtest():
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Backtest creation error: {e}")
         return jsonify({'error': 'Failed to create backtest'}), 500
 
@@ -143,7 +150,7 @@ def _run_backtest_async(backtest_id, strategy_id, universe, strategy_parameters)
     try:
         with current_app.app_context():
             # Get backtest from database
-            backtest = Backtest.query.get(backtest_id)
+            backtest = Backtest.query.filter_by(id=backtest_id).first()
             if not backtest:
                 return
             
@@ -193,16 +200,20 @@ def _run_backtest_async(backtest_id, strategy_id, universe, strategy_parameters)
             # Update backtest with results
             backtest.status = 'completed'
             backtest.completed_at = datetime.utcnow()
-            backtest.execution_time = results.execution_time
+            backtest.duration_seconds = results.execution_time
             backtest.progress = 100.0
             
-            # Store performance metrics
+            # Store performance metrics (mapping to correct model fields)
+            backtest.final_value = backtest.initial_capital + results.total_return
             backtest.total_return = results.total_return
+            backtest.total_return_pct = (results.total_return / backtest.initial_capital) * 100 if backtest.initial_capital > 0 else 0
             backtest.annualized_return = results.annualized_return
             backtest.volatility = results.volatility
             backtest.sharpe_ratio = results.sharpe_ratio
             backtest.max_drawdown = results.max_drawdown
             backtest.total_trades = results.total_trades
+            backtest.winning_trades = getattr(results, 'winning_trades', 0)
+            backtest.losing_trades = getattr(results, 'losing_trades', 0)
             backtest.win_rate = results.win_rate
             
             # Create detailed performance record
@@ -236,7 +247,7 @@ def _run_backtest_async(backtest_id, strategy_id, universe, strategy_parameters)
         # Update backtest status to failed
         try:
             with current_app.app_context():
-                backtest = Backtest.query.get(backtest_id)
+                backtest = Backtest.query.filter_by(id=backtest_id).first()
                 if backtest:
                     backtest.status = 'failed'
                     backtest.error_message = str(e)
@@ -277,21 +288,47 @@ def get_backtests():
         # Format response
         backtests_data = []
         for backtest in backtests:
+            # Extract universe symbols for frontend compatibility
+            universe_symbols = backtest.universe if isinstance(backtest.universe, list) else []
+            symbol = ','.join(universe_symbols) if universe_symbols else 'N/A'
+            
+            # Extract strategy parameters if available
+            strategy_params = {}
+            if hasattr(backtest, 'parameters') and backtest.parameters:
+                try:
+                    strategy_params = backtest.parameters if isinstance(backtest.parameters, dict) else {}
+                except:
+                    pass
+            
+            # Determine strategy name based on strategy_id (since we don't have a strategies table yet)
+            strategy_name = 'Unknown Strategy'
+            if hasattr(backtest, 'strategy_id'):
+                # For now, we'll determine strategy name from parameters or use a default mapping
+                if 'fast_period' in strategy_params and 'slow_period' in strategy_params:
+                    strategy_name = 'Moving Average Crossover'
+                elif 'lookback_period' in strategy_params and 'top_n_stocks' in strategy_params:
+                    strategy_name = 'Momentum Strategy'
+                elif 'rebalance_frequency' in strategy_params:
+                    strategy_name = 'Buy and Hold'
+            
             backtests_data.append({
                 'id': backtest.id,
                 'name': backtest.name,
                 'description': backtest.description,
-                'start_date': backtest.start_date.isoformat(),
-                'end_date': backtest.end_date.isoformat(),
-                'initial_capital': backtest.initial_capital,
+                'strategy_name': strategy_name,
+                'symbol': symbol,
+                'start_date': backtest.start_date.isoformat() if backtest.start_date else None,
+                'end_date': backtest.end_date.isoformat() if backtest.end_date else None,
+                'initial_capital': float(backtest.initial_capital) if backtest.initial_capital else 0,
+                'final_value': float(backtest.final_value) if backtest.final_value else None,
+                'total_return': float(backtest.total_return) if backtest.total_return else None,
+                'return_percent': float(backtest.total_return_pct) if backtest.total_return_pct else None,
+                'total_trades': backtest.total_trades or 0,
+                'win_rate': float(backtest.win_rate) if backtest.win_rate else None,
+                'max_drawdown': float(backtest.max_drawdown) if backtest.max_drawdown else None,
+                'sharpe_ratio': float(backtest.sharpe_ratio) if backtest.sharpe_ratio else None,
                 'status': backtest.status,
-                'progress': backtest.progress,
-                'total_return': backtest.total_return,
-                'sharpe_ratio': backtest.sharpe_ratio,
-                'max_drawdown': backtest.max_drawdown,
-                'total_trades': backtest.total_trades,
-                'win_rate': backtest.win_rate,
-                'execution_time': backtest.execution_time,
+                'progress': float(backtest.progress) if backtest.progress else 0.0,
                 'created_at': backtest.created_at.isoformat(),
                 'started_at': backtest.started_at.isoformat() if backtest.started_at else None,
                 'completed_at': backtest.completed_at.isoformat() if backtest.completed_at else None
@@ -414,6 +451,7 @@ def get_backtest_results(backtest_id):
         logger.error(f"Get backtest results error: {e}")
         return jsonify({'error': 'Failed to retrieve backtest results'}), 500
 
+
 @backtest_bp.route('/backtests/<int:backtest_id>/status', methods=['GET'])
 @token_required
 @handle_validation_error
@@ -475,6 +513,7 @@ def delete_backtest(backtest_id):
         return jsonify({'message': 'Backtest deleted successfully'}), 200
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Backtest deletion error: {e}")
         return jsonify({'error': 'Failed to delete backtest'}), 500
 

@@ -1,112 +1,109 @@
 import json
-from .base import BaseModel
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Index, CheckConstraint, Numeric, Text
-from sqlalchemy.orm import relationship
-from sqlalchemy.dialects.postgresql import JSONB
 from datetime import datetime
 from .base import BaseModel
+from ..db import db
 
 class Backtest(BaseModel):
     """Backtest model for strategy backtesting with PostgreSQL optimizations."""
     __tablename__ = 'backtests'
     
     # Foreign keys
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
-    strategy_id = Column(Integer, ForeignKey('strategies.id'), nullable=False, index=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False, index=True)
+    strategy_id = db.Column(db.Integer, db.ForeignKey('strategies.id'), nullable=False, index=True)
     
     # Backtest identification
-    name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
     
     # Backtest configuration
-    start_date = Column(DateTime, nullable=False, index=True)
-    end_date = Column(DateTime, nullable=False, index=True)
-    initial_capital = Column(Numeric(15, 2), nullable=False)
-    benchmark_symbol = Column(String(20), default='SPY', nullable=False)
+    start_date = db.Column(db.DateTime, nullable=False, index=True)
+    end_date = db.Column(db.DateTime, nullable=False, index=True)
+    initial_capital = db.Column(db.Numeric(15, 2), nullable=False)
+    benchmark_symbol = db.Column(db.String(20), default='SPY', nullable=False)
     
     # Universe and filters
-    universe = Column(JSONB, nullable=False)  # List of symbols or universe definition
-    filters = Column(JSONB, nullable=True)    # Additional filters applied
+    universe = db.Column(db.JSON, nullable=False)  # List of symbols or universe definition
+    filters = db.Column(db.JSON, nullable=True)    # Additional filters applied
     
     # Execution settings
-    commission_model = Column(String(50), default='fixed', nullable=False)
-    commission_rate = Column(Numeric(8, 4), default=0.001, nullable=False)  # 0.1% default
-    slippage_model = Column(String(50), default='linear', nullable=False)
-    slippage_rate = Column(Numeric(8, 4), default=0.001, nullable=False)
+    commission_model = db.Column(db.String(50), default='fixed', nullable=False)
+    commission_rate = db.Column(db.Numeric(8, 4), default=0.001, nullable=False)  # 0.1% default
+    slippage_model = db.Column(db.String(50), default='linear', nullable=False)
+    slippage_rate = db.Column(db.Numeric(8, 4), default=0.001, nullable=False)
     
     # Position sizing
-    position_sizing_method = Column(String(50), default='equal_weight', nullable=False)
-    max_position_size = Column(Numeric(5, 2), default=10.0, nullable=False)  # % of portfolio
-    max_positions = Column(Integer, default=20, nullable=False)
+    position_sizing_method = db.Column(db.String(50), default='equal_weight', nullable=False)
+    max_position_size = db.Column(db.Numeric(5, 2), default=10.0, nullable=False)  # % of portfolio
+    max_positions = db.Column(db.Integer, default=20, nullable=False)
     
     # Backtest status
-    status = Column(String(20), default='pending', nullable=False, index=True)
-    progress = Column(Numeric(5, 2), default=0.0, nullable=False)  # 0-100%
+    status = db.Column(db.String(20), default='pending', nullable=False, index=True)
+    progress = db.Column(db.Numeric(5, 2), default=0.0, nullable=False)  # 0-100%
     
     # Execution timestamps
-    started_at = Column(DateTime, nullable=True)
-    completed_at = Column(DateTime, nullable=True)
-    duration_seconds = Column(Integer, nullable=True)
+    started_at = db.Column(db.DateTime, nullable=True)
+    completed_at = db.Column(db.DateTime, nullable=True)
+    duration_seconds = db.Column(db.Integer, nullable=True)
     
     # Results summary - Using Numeric for precision
-    final_value = Column(Numeric(15, 2), nullable=True)
-    total_return = Column(Numeric(15, 2), nullable=True)
-    total_return_pct = Column(Numeric(8, 4), nullable=True)
-    annualized_return = Column(Numeric(8, 4), nullable=True)
+    final_value = db.Column(db.Numeric(15, 2), nullable=True)
+    total_return = db.Column(db.Numeric(15, 2), nullable=True)
+    total_return_pct = db.Column(db.Numeric(8, 4), nullable=True)
+    annualized_return = db.Column(db.Numeric(8, 4), nullable=True)
     
     # Risk metrics - Using Numeric for precision
-    volatility = Column(Numeric(8, 4), nullable=True)
-    sharpe_ratio = Column(Numeric(8, 4), nullable=True)
-    sortino_ratio = Column(Numeric(8, 4), nullable=True)
-    max_drawdown = Column(Numeric(8, 4), nullable=True)
-    max_drawdown_duration = Column(Integer, nullable=True)
+    volatility = db.Column(db.Numeric(8, 4), nullable=True)
+    sharpe_ratio = db.Column(db.Numeric(8, 4), nullable=True)
+    sortino_ratio = db.Column(db.Numeric(8, 4), nullable=True)
+    max_drawdown = db.Column(db.Numeric(8, 4), nullable=True)
+    max_drawdown_duration = db.Column(db.Integer, nullable=True)
     
     # Benchmark comparison
-    benchmark_return = Column(Numeric(8, 4), nullable=True)
-    excess_return = Column(Numeric(8, 4), nullable=True)
-    tracking_error = Column(Numeric(8, 4), nullable=True)
-    information_ratio = Column(Numeric(8, 4), nullable=True)
+    benchmark_return = db.Column(db.Numeric(8, 4), nullable=True)
+    excess_return = db.Column(db.Numeric(8, 4), nullable=True)
+    tracking_error = db.Column(db.Numeric(8, 4), nullable=True)
+    information_ratio = db.Column(db.Numeric(8, 4), nullable=True)
     
     # Trade statistics
-    total_trades = Column(Integer, default=0, nullable=False)
-    winning_trades = Column(Integer, default=0, nullable=False)
-    losing_trades = Column(Integer, default=0, nullable=False)
-    win_rate = Column(Numeric(5, 2), default=0.0, nullable=False)
+    total_trades = db.Column(db.Integer, default=0, nullable=False)
+    winning_trades = db.Column(db.Integer, default=0, nullable=False)
+    losing_trades = db.Column(db.Integer, default=0, nullable=False)
+    win_rate = db.Column(db.Numeric(5, 2), default=0.0, nullable=False)
     
     # Error handling
-    error_message = Column(Text, nullable=True)
-    warnings = Column(JSONB, nullable=True)  # Array of warning messages
+    error_message = db.Column(db.Text, nullable=True)
+    warnings = db.Column(db.JSON, nullable=True)  # Array of warning messages
     
-    # Backtest configuration stored as JSONB
-    parameters = Column(JSONB, nullable=True)  # Strategy parameters used
-    settings = Column(JSONB, nullable=True)    # Additional backtest settings
+    # Backtest configuration stored as JSON
+    parameters = db.Column(db.JSON, nullable=True)  # Strategy parameters used
+    settings = db.Column(db.JSON, nullable=True)    # Additional backtest settings
     
     # Relationships
-    user = relationship("User")
-    strategy = relationship("Strategy", back_populates="backtests")
-    portfolios = relationship("Portfolio", back_populates="backtest")
-    trades = relationship("Trade", back_populates="backtest", cascade="all, delete-orphan")
-    signals = relationship("Signal", back_populates="backtest", cascade="all, delete-orphan")
-    performance = relationship("BacktestPerformance", back_populates="backtest", uselist=False)
+    user = db.relationship("User")
+    strategy = db.relationship("Strategy", back_populates="backtests")
+    portfolios = db.relationship("Portfolio", back_populates="backtest")
+    trades = db.relationship("Trade", back_populates="backtest", cascade="all, delete-orphan")
+    signals = db.relationship("Signal", back_populates="backtest", cascade="all, delete-orphan")
+    performance = db.relationship("BacktestPerformance", back_populates="backtest", uselist=False)
     
     # Indexes for performance
     __table_args__ = (
-        Index('idx_backtest_user_strategy', 'user_id', 'strategy_id'),
-        Index('idx_backtest_dates', 'start_date', 'end_date'),
-        Index('idx_backtest_status_created', 'status', 'created_at'),
-        Index('idx_backtest_completed_return', 'completed_at', 'total_return_pct'),
-        CheckConstraint('initial_capital > 0', name='ck_initial_capital_positive'),
-        CheckConstraint('commission_rate >= 0', name='ck_commission_rate_non_negative'),
-        CheckConstraint('slippage_rate >= 0', name='ck_slippage_rate_non_negative'),
-        CheckConstraint('max_position_size > 0 AND max_position_size <= 100', name='ck_max_position_size_valid'),
-        CheckConstraint('max_positions > 0', name='ck_max_positions_positive'),
-        CheckConstraint('progress >= 0 AND progress <= 100', name='ck_progress_valid'),
-        CheckConstraint('end_date > start_date', name='ck_dates_valid'),
-        CheckConstraint('status IN (\'pending\', \'running\', \'completed\', \'failed\', \'cancelled\')', name='ck_status_valid'),
-        CheckConstraint('total_trades >= 0', name='ck_total_trades_non_negative'),
-        CheckConstraint('winning_trades >= 0', name='ck_winning_trades_non_negative'),
-        CheckConstraint('losing_trades >= 0', name='ck_losing_trades_non_negative'),
-        CheckConstraint('win_rate >= 0 AND win_rate <= 100', name='ck_win_rate_valid'),
+        db.Index('idx_backtest_user_strategy', 'user_id', 'strategy_id'),
+        db.Index('idx_backtest_dates', 'start_date', 'end_date'),
+        db.Index('idx_backtest_status_created', 'status', 'created_at'),
+        db.Index('idx_backtest_completed_return', 'completed_at', 'total_return_pct'),
+        db.CheckConstraint('initial_capital > 0', name='ck_initial_capital_positive'),
+        db.CheckConstraint('commission_rate >= 0', name='ck_commission_rate_non_negative'),
+        db.CheckConstraint('slippage_rate >= 0', name='ck_slippage_rate_non_negative'),
+        db.CheckConstraint('max_position_size > 0 AND max_position_size <= 100', name='ck_max_position_size_valid'),
+        db.CheckConstraint('max_positions > 0', name='ck_max_positions_positive'),
+        db.CheckConstraint('progress >= 0 AND progress <= 100', name='ck_progress_valid'),
+        db.CheckConstraint('end_date > start_date', name='ck_dates_valid'),
+        db.CheckConstraint('status IN (\'pending\', \'running\', \'completed\', \'failed\', \'cancelled\')', name='ck_status_valid'),
+        db.CheckConstraint('total_trades >= 0', name='ck_total_trades_non_negative'),
+        db.CheckConstraint('winning_trades >= 0', name='ck_winning_trades_non_negative'),
+        db.CheckConstraint('losing_trades >= 0', name='ck_losing_trades_non_negative'),
+        db.CheckConstraint('win_rate >= 0 AND win_rate <= 100', name='ck_win_rate_valid'),
     )
     
     def calculate_metrics(self):
@@ -132,69 +129,69 @@ class Trade(BaseModel):
     __tablename__ = 'trades'
     
     # Foreign keys
-    backtest_id = Column(Integer, ForeignKey('backtests.id'), nullable=False, index=True)
-    symbol = Column(String(20), nullable=False, index=True)
+    backtest_id = db.Column(db.Integer, db.ForeignKey('backtests.id'), nullable=False, index=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
     
     # Trade identification
-    trade_id = Column(String(100), nullable=False, index=True)  # Unique per backtest
-    signal_id = Column(String(100), nullable=True, index=True)   # Related signal
+    trade_id = db.Column(db.String(100), nullable=False, index=True)  # Unique per backtest
+    signal_id = db.Column(db.String(100), nullable=True, index=True)   # Related signal
     
     # Trade details
-    direction = Column(String(10), nullable=False, index=True)  # LONG, SHORT
-    quantity = Column(Numeric(15, 6), nullable=False)
+    direction = db.Column(db.String(10), nullable=False, index=True)  # LONG, SHORT
+    quantity = db.Column(db.Numeric(15, 6), nullable=False)
     
     # Entry details - Using Numeric for precision
-    entry_date = Column(DateTime, nullable=False, index=True)
-    entry_price = Column(Numeric(10, 4), nullable=False)
-    entry_value = Column(Numeric(15, 2), nullable=False)
+    entry_date = db.Column(db.DateTime, nullable=False, index=True)
+    entry_price = db.Column(db.Numeric(10, 4), nullable=False)
+    entry_value = db.Column(db.Numeric(15, 2), nullable=False)
     
     # Exit details - Using Numeric for precision
-    exit_date = Column(DateTime, nullable=True, index=True)
-    exit_price = Column(Numeric(10, 4), nullable=True)
-    exit_value = Column(Numeric(15, 2), nullable=True)
-    exit_reason = Column(String(50), nullable=True)  # stop_loss, take_profit, signal, etc.
+    exit_date = db.Column(db.DateTime, nullable=True, index=True)
+    exit_price = db.Column(db.Numeric(10, 4), nullable=True)
+    exit_value = db.Column(db.Numeric(15, 2), nullable=True)
+    exit_reason = db.Column(db.String(50), nullable=True)  # stop_loss, take_profit, signal, etc.
     
     # Trade performance - Using Numeric for precision
-    pnl = Column(Numeric(15, 2), nullable=True)
-    pnl_pct = Column(Numeric(8, 4), nullable=True)
+    pnl = db.Column(db.Numeric(15, 2), nullable=True)
+    pnl_pct = db.Column(db.Numeric(8, 4), nullable=True)
     
     # Costs - Using Numeric for precision
-    entry_commission = Column(Numeric(10, 2), default=0.0, nullable=False)
-    exit_commission = Column(Numeric(10, 2), default=0.0, nullable=False)
-    entry_slippage = Column(Numeric(10, 2), default=0.0, nullable=False)
-    exit_slippage = Column(Numeric(10, 2), default=0.0, nullable=False)
+    entry_commission = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
+    exit_commission = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
+    entry_slippage = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
+    exit_slippage = db.Column(db.Numeric(10, 2), default=0.0, nullable=False)
     
     # Trade metadata
-    is_open = Column(Boolean, default=True, nullable=False, index=True)
-    duration_days = Column(Numeric(8, 2), nullable=True)
+    is_open = db.Column(db.Boolean, default=True, nullable=False, index=True)
+    duration_days = db.Column(db.Numeric(8, 2), nullable=True)
     
     # Risk metrics
-    max_adverse_excursion = Column(Numeric(15, 2), nullable=True)
-    max_favorable_excursion = Column(Numeric(15, 2), nullable=True)
+    max_adverse_excursion = db.Column(db.Numeric(15, 2), nullable=True)
+    max_favorable_excursion = db.Column(db.Numeric(15, 2), nullable=True)
     
-    # Additional trade data stored as JSONB
-    entry_conditions = Column(JSONB, nullable=True)  # Conditions that triggered entry
-    exit_conditions = Column(JSONB, nullable=True)   # Conditions that triggered exit
-    additional_metadata = Column(JSONB, nullable=True)          # Additional trade metadata
+    # Additional trade data stored as JSON
+    entry_conditions = db.Column(db.JSON, nullable=True)  # Conditions that triggered entry
+    exit_conditions = db.Column(db.JSON, nullable=True)   # Conditions that triggered exit
+    additional_metadata = db.Column(db.JSON, nullable=True)          # Additional trade metadata
     
     # Relationships
-    backtest = relationship("Backtest", back_populates="trades")
+    backtest = db.relationship("Backtest", back_populates="trades")
     
     # Indexes for performance
     __table_args__ = (
-        Index('idx_trade_backtest_symbol_date', 'backtest_id', 'symbol', 'entry_date'),
-        Index('idx_trade_entry_exit_dates', 'entry_date', 'exit_date'),
-        Index('idx_trade_direction_open', 'direction', 'is_open'),
-        Index('idx_trade_pnl', 'pnl'),
-        CheckConstraint('quantity > 0', name='ck_quantity_positive'),
-        CheckConstraint('entry_price > 0', name='ck_entry_price_positive'),
-        CheckConstraint('entry_value > 0', name='ck_entry_value_positive'),
-        CheckConstraint('exit_price > 0 OR exit_price IS NULL', name='ck_exit_price_positive_or_null'),
-        CheckConstraint('direction IN (\'LONG\', \'SHORT\')', name='ck_direction_valid'),
-        CheckConstraint('entry_commission >= 0', name='ck_entry_commission_non_negative'),
-        CheckConstraint('exit_commission >= 0', name='ck_exit_commission_non_negative'),
-        CheckConstraint('entry_slippage >= 0', name='ck_entry_slippage_non_negative'),
-        CheckConstraint('exit_slippage >= 0', name='ck_exit_slippage_non_negative'),
+        db.Index('idx_trade_backtest_symbol_date', 'backtest_id', 'symbol', 'entry_date'),
+        db.Index('idx_trade_entry_exit_dates', 'entry_date', 'exit_date'),
+        db.Index('idx_trade_direction_open', 'direction', 'is_open'),
+        db.Index('idx_trade_pnl', 'pnl'),
+        db.CheckConstraint('quantity > 0', name='ck_quantity_positive'),
+        db.CheckConstraint('entry_price > 0', name='ck_entry_price_positive'),
+        db.CheckConstraint('entry_value > 0', name='ck_entry_value_positive'),
+        db.CheckConstraint('exit_price > 0 OR exit_price IS NULL', name='ck_exit_price_positive_or_null'),
+        db.CheckConstraint('direction IN (\'LONG\', \'SHORT\')', name='ck_direction_valid'),
+        db.CheckConstraint('entry_commission >= 0', name='ck_entry_commission_non_negative'),
+        db.CheckConstraint('exit_commission >= 0', name='ck_exit_commission_non_negative'),
+        db.CheckConstraint('entry_slippage >= 0', name='ck_entry_slippage_non_negative'),
+        db.CheckConstraint('exit_slippage >= 0', name='ck_exit_slippage_non_negative'),
     )
     
     def calculate_pnl(self):
@@ -226,52 +223,52 @@ class Signal(BaseModel):
     __tablename__ = 'signals'
     
     # Foreign keys
-    backtest_id = Column(Integer, ForeignKey('backtests.id'), nullable=False, index=True)
-    symbol = Column(String(20), nullable=False, index=True)
+    backtest_id = db.Column(db.Integer, db.ForeignKey('backtests.id'), nullable=False, index=True)
+    symbol = db.Column(db.String(20), nullable=False, index=True)
     
     # Signal identification
-    signal_id = Column(String(100), nullable=False, index=True)
-    signal_type = Column(String(20), nullable=False, index=True)  # BUY, SELL, HOLD
+    signal_id = db.Column(db.String(100), nullable=False, index=True)
+    signal_type = db.Column(db.String(20), nullable=False, index=True)  # BUY, SELL, HOLD
     
     # Signal details
-    signal_date = Column(DateTime, nullable=False, index=True)
-    signal_price = Column(Numeric(10, 4), nullable=False)
-    confidence = Column(Numeric(5, 4), default=1.0, nullable=False)  # 0.0 to 1.0
+    signal_date = db.Column(db.DateTime, nullable=False, index=True)
+    signal_price = db.Column(db.Numeric(10, 4), nullable=False)
+    confidence = db.Column(db.Numeric(5, 4), default=1.0, nullable=False)  # 0.0 to 1.0
     
     # Signal strength and ranking
-    strength = Column(Numeric(8, 4), default=0.0, nullable=False)  # Relative signal strength
-    rank = Column(Integer, nullable=True)  # Signal rank among all signals on this date
+    strength = db.Column(db.Numeric(8, 4), default=0.0, nullable=False)  # Relative signal strength
+    rank = db.Column(db.Integer, nullable=True)  # Signal rank among all signals on this date
     
     # Position sizing suggestion
-    suggested_quantity = Column(Numeric(15, 6), nullable=True)
-    suggested_weight = Column(Numeric(5, 2), nullable=True)  # % of portfolio
+    suggested_quantity = db.Column(db.Numeric(15, 6), nullable=True)
+    suggested_weight = db.Column(db.Numeric(5, 2), nullable=True)  # % of portfolio
     
-    # Signal conditions and metadata stored as JSONB
-    conditions = Column(JSONB, nullable=False)  # Conditions that generated the signal
-    indicators = Column(JSONB, nullable=True)   # Technical indicators values
-    additional_metadata = Column(JSONB, nullable=True)     # Additional signal data
+    # Signal conditions and metadata stored as JSON
+    conditions = db.Column(db.JSON, nullable=False)  # Conditions that generated the signal
+    indicators = db.Column(db.JSON, nullable=True)   # Technical indicators values
+    additional_metadata = db.Column(db.JSON, nullable=True)     # Additional signal data
     
     # Signal execution
-    was_executed = Column(Boolean, default=False, nullable=False, index=True)
-    execution_delay = Column(Integer, nullable=True)  # Bars/periods delay
-    execution_price = Column(Numeric(10, 4), nullable=True)
-    execution_slippage = Column(Numeric(10, 2), nullable=True)
+    was_executed = db.Column(db.Boolean, default=False, nullable=False, index=True)
+    execution_delay = db.Column(db.Integer, nullable=True)  # Bars/periods delay
+    execution_price = db.Column(db.Numeric(10, 4), nullable=True)
+    execution_slippage = db.Column(db.Numeric(10, 2), nullable=True)
     
     # Relationships
-    backtest = relationship("Backtest", back_populates="signals")
+    backtest = db.relationship("Backtest", back_populates="signals")
     
     # Indexes for performance
     __table_args__ = (
-        Index('idx_signal_backtest_date_type', 'backtest_id', 'signal_date', 'signal_type'),
-        Index('idx_signal_symbol_date', 'symbol', 'signal_date'),
-        Index('idx_signal_executed_confidence', 'was_executed', 'confidence'),
-        Index('idx_signal_strength_rank', 'strength', 'rank'),
-        CheckConstraint('signal_price > 0', name='ck_signal_price_positive'),
-        CheckConstraint('confidence >= 0 AND confidence <= 1', name='ck_confidence_valid'),
-        CheckConstraint('suggested_weight >= 0 AND suggested_weight <= 100 OR suggested_weight IS NULL', name='ck_suggested_weight_valid'),
-        CheckConstraint('signal_type IN (\'BUY\', \'SELL\', \'HOLD\', \'CLOSE\')', name='ck_signal_type_valid'),
-        CheckConstraint('execution_delay >= 0 OR execution_delay IS NULL', name='ck_execution_delay_non_negative'),
-        CheckConstraint('execution_price > 0 OR execution_price IS NULL', name='ck_execution_price_positive_or_null'),
+        db.Index('idx_signal_backtest_date_type', 'backtest_id', 'signal_date', 'signal_type'),
+        db.Index('idx_signal_symbol_date', 'symbol', 'signal_date'),
+        db.Index('idx_signal_executed_confidence', 'was_executed', 'confidence'),
+        db.Index('idx_signal_strength_rank', 'strength', 'rank'),
+        db.CheckConstraint('signal_price > 0', name='ck_signal_price_positive'),
+        db.CheckConstraint('confidence >= 0 AND confidence <= 1', name='ck_confidence_valid'),
+        db.CheckConstraint('suggested_weight >= 0 AND suggested_weight <= 100 OR suggested_weight IS NULL', name='ck_suggested_weight_valid'),
+        db.CheckConstraint('signal_type IN (\'BUY\', \'SELL\', \'HOLD\', \'CLOSE\')', name='ck_signal_type_valid'),
+        db.CheckConstraint('execution_delay >= 0 OR execution_delay IS NULL', name='ck_execution_delay_non_negative'),
+        db.CheckConstraint('execution_price > 0 OR execution_price IS NULL', name='ck_execution_price_positive_or_null'),
     )
 
 class BacktestPerformance(BaseModel):
@@ -279,47 +276,49 @@ class BacktestPerformance(BaseModel):
     __tablename__ = 'backtest_performance'
     
     # Foreign key
-    backtest_id = Column(Integer, ForeignKey('backtests.id'), nullable=False, unique=True, index=True)
+    backtest_id = db.Column(db.Integer, db.ForeignKey('backtests.id'), nullable=False, unique=True, index=True)
     
     # Performance metrics - Using Numeric for financial precision
-    total_return = Column(Numeric(15, 2), nullable=False)
-    total_return_pct = Column(Numeric(8, 4), nullable=False)
-    annualized_return = Column(Numeric(8, 4), nullable=False)
+    total_return = db.Column(db.Numeric(15, 2), nullable=False)
+    total_return_pct = db.Column(db.Numeric(8, 4), nullable=False)
+    annualized_return = db.Column(db.Numeric(8, 4), nullable=False)
     
     # Risk metrics
-    volatility = Column(Numeric(8, 4), nullable=False)
-    sharpe_ratio = Column(Numeric(8, 4), nullable=True)
-    sortino_ratio = Column(Numeric(8, 4), nullable=True)
-    max_drawdown = Column(Numeric(8, 4), nullable=False)
-    max_drawdown_duration = Column(Integer, nullable=True)  # Days
+    volatility = db.Column(db.Numeric(8, 4), nullable=False)
+    sharpe_ratio = db.Column(db.Numeric(8, 4), nullable=True)
+    sortino_ratio = db.Column(db.Numeric(8, 4), nullable=True)
+    max_drawdown = db.Column(db.Numeric(8, 4), nullable=False)
+    max_drawdown_duration = db.Column(db.Integer, nullable=True)  # Days
     
     # Trade statistics
-    total_trades = Column(Integer, default=0, nullable=False)
-    winning_trades = Column(Integer, default=0, nullable=False)
-    losing_trades = Column(Integer, default=0, nullable=False)
-    win_rate = Column(Numeric(8, 4), nullable=True)
-    avg_win = Column(Numeric(15, 2), nullable=True)
-    avg_loss = Column(Numeric(15, 2), nullable=True)
-    profit_factor = Column(Numeric(8, 4), nullable=True)
+    total_trades = db.Column(db.Integer, default=0, nullable=False)
+    winning_trades = db.Column(db.Integer, default=0, nullable=False)
+    losing_trades = db.Column(db.Integer, default=0, nullable=False)
+    win_rate = db.Column(db.Numeric(8, 4), nullable=True)
+    avg_win = db.Column(db.Numeric(15, 2), nullable=True)
+    avg_loss = db.Column(db.Numeric(15, 2), nullable=True)
+    profit_factor = db.Column(db.Numeric(8, 4), nullable=True)
     
     # Benchmark comparison
-    benchmark_return = Column(Numeric(8, 4), nullable=True)
-    alpha = Column(Numeric(8, 4), nullable=True)
-    beta = Column(Numeric(8, 4), nullable=True)
-    correlation = Column(Numeric(8, 4), nullable=True)
-    
-    # Additional metrics stored as JSONB
-    additional_metrics = Column(JSONB, nullable=True)
+    benchmark_return = db.Column(db.Numeric(8, 4), nullable=True)
+    alpha = db.Column(db.Numeric(8, 4), nullable=True)
+    beta = db.Column(db.Numeric(8, 4), nullable=True)
+    correlation = db.Column(db.Numeric(8, 4), nullable=True)
+    sortino_ratio = db.Column(db.Float, nullable=True)         # ✅ Newly added
+    calmar_ratio = db.Column(db.Float, nullable=True)          # ✅ Newly added
+    avg_holding_period = db.Column(db.Float, nullable=True)   
+    # Additional metrics stored as JSON
+    additional_metrics = db.Column(db.JSON, nullable=True)
     
     # Relationships
-    backtest = relationship("Backtest", back_populates="performance")
+    backtest = db.relationship("Backtest", back_populates="performance")
     
     # Constraints
     __table_args__ = (
-        CheckConstraint('total_trades >= 0', name='ck_total_trades_non_negative'),
-        CheckConstraint('winning_trades >= 0', name='ck_winning_trades_non_negative'),
-        CheckConstraint('losing_trades >= 0', name='ck_losing_trades_non_negative'),
-        CheckConstraint('winning_trades + losing_trades <= total_trades', name='ck_trade_counts_valid'),
+        db.CheckConstraint('total_trades >= 0', name='ck_total_trades_non_negative'),
+        db.CheckConstraint('winning_trades >= 0', name='ck_winning_trades_non_negative'),
+        db.CheckConstraint('losing_trades >= 0', name='ck_losing_trades_non_negative'),
+        db.CheckConstraint('winning_trades + losing_trades <= total_trades', name='ck_trade_counts_valid'),
     )
 
 
@@ -328,32 +327,32 @@ class BacktestLog(BaseModel):
     __tablename__ = 'backtest_logs'
     
     # Foreign key
-    backtest_id = Column(Integer, ForeignKey('backtests.id'), nullable=False, index=True)
+    backtest_id = db.Column(db.Integer, db.ForeignKey('backtests.id'), nullable=False, index=True)
     
     # Log details
-    log_level = Column(String(10), nullable=False, index=True)  # DEBUG, INFO, WARN, ERROR
-    message = Column(Text, nullable=False)
-    module = Column(String(100), nullable=True)
-    function_name = Column(String(100), nullable=True)
+    log_level = db.Column(db.String(10), nullable=False, index=True)  # DEBUG, INFO, WARN, ERROR
+    message = db.Column(db.Text, nullable=False)
+    module = db.Column(db.String(100), nullable=True)
+    function_name = db.Column(db.String(100), nullable=True)
     
     # Timing
-    log_timestamp = Column(DateTime, default=datetime.utcnow, nullable=False, index=True)
-    simulation_date = Column(DateTime, nullable=True, index=True)  # Date in simulation
+    log_timestamp = db.Column(db.DateTime, default=datetime.utcnow, nullable=False, index=True)
+    simulation_date = db.Column(db.DateTime, nullable=True, index=True)  # Date in simulation
     
     # Context
-    symbol = Column(String(20), nullable=True, index=True)
-    trade_id = Column(Integer, ForeignKey('trades.id'), nullable=True)
-    additional_context = Column(JSONB, nullable=True)
+    symbol = db.Column(db.String(20), nullable=True, index=True)
+    trade_id = db.Column(db.Integer, db.ForeignKey('trades.id'), nullable=True)
+    additional_context = db.Column(db.JSON, nullable=True)
     
     # Relationships
-    backtest = relationship("Backtest", backref="logs")
-    trade = relationship("Trade", backref="logs")
+    backtest = db.relationship("Backtest", backref="logs")
+    trade = db.relationship("Trade", backref="logs")
     
     # Indexes
     __table_args__ = (
-        Index('idx_backtest_log_level_timestamp', 'backtest_id', 'log_level', 'log_timestamp'),
-        Index('idx_backtest_log_simulation_date', 'backtest_id', 'simulation_date'),
-        CheckConstraint('log_level IN (\'DEBUG\', \'INFO\', \'WARN\', \'ERROR\')', name='ck_log_level_valid'),
+        db.Index('idx_backtest_log_level_timestamp', 'backtest_id', 'log_level', 'log_timestamp'),
+        db.Index('idx_backtest_log_simulation_date', 'backtest_id', 'simulation_date'),
+        db.CheckConstraint('log_level IN (\'DEBUG\', \'INFO\', \'WARN\', \'ERROR\')', name='ck_log_level_valid'),
     )
 
 
@@ -362,26 +361,26 @@ class BacktestComparison(BaseModel):
     __tablename__ = 'backtest_comparisons'
     
     # Comparison metadata
-    name = Column(String(200), nullable=False)
-    description = Column(Text, nullable=True)
-    comparison_type = Column(String(50), default='performance', nullable=False)
+    name = db.Column(db.String(200), nullable=False)
+    description = db.Column(db.Text, nullable=True)
+    comparison_type = db.Column(db.String(50), default='performance', nullable=False)
     
     # Backtests being compared (stored as array of IDs)
-    backtest_ids = Column(JSONB, nullable=False)  # Array of backtest IDs
+    backtest_ids = db.Column(db.JSON, nullable=False)  # Array of backtest IDs
     
     # Comparison results
-    results = Column(JSONB, nullable=True)  # Detailed comparison results
-    summary = Column(JSONB, nullable=True)  # Summary statistics
+    results = db.Column(db.JSON, nullable=True)  # Detailed comparison results
+    summary = db.Column(db.JSON, nullable=True)  # Summary statistics
     
     # Analysis metadata
-    analysis_date = Column(DateTime, default=datetime.utcnow, nullable=False)
-    analysis_parameters = Column(JSONB, nullable=True)
+    analysis_date = db.Column(db.DateTime, default=datetime.utcnow, nullable=False)
+    analysis_parameters = db.Column(db.JSON, nullable=True)
     
     # Status
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     
     # Constraints
     __table_args__ = (
-        Index('idx_comparison_type_date', 'comparison_type', 'analysis_date'),
-        CheckConstraint('comparison_type IN (\'performance\', \'risk\', \'correlation\', \'optimization\')', name='ck_comparison_type_valid'),
+        db.Index('idx_comparison_type_date', 'comparison_type', 'analysis_date'),
+        db.CheckConstraint('comparison_type IN (\'performance\', \'risk\', \'correlation\', \'optimization\')', name='ck_comparison_type_valid'),
     )

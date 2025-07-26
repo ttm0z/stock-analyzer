@@ -34,60 +34,9 @@ const Backtests = () => {
       setLoading(true);
       setError(null);
       
-      // TODO: Implement actual API call when backtest service is ready
-      // const response = await BacktestAPI.getBacktests();
-      // setBacktests(response.backtests || []);
-      
-      // Mock data for now
-      setBacktests([
-        {
-          id: 1,
-          name: 'MA Crossover on AAPL',
-          strategy_name: 'Moving Average Crossover',
-          symbol: 'AAPL',
-          start_date: '2023-01-01',
-          end_date: '2023-12-31',
-          initial_capital: 10000,
-          final_value: 11250,
-          total_return: 1250,
-          return_percent: 12.5,
-          total_trades: 24,
-          win_rate: 65.2,
-          max_drawdown: -8.3,
-          sharpe_ratio: 1.45,
-          status: 'completed',
-          created_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 2,
-          name: 'RSI Strategy on TSLA',
-          strategy_name: 'RSI Reversal',
-          symbol: 'TSLA',
-          start_date: '2023-06-01',
-          end_date: '2023-12-31',
-          initial_capital: 5000,
-          final_value: 4800,
-          total_return: -200,
-          return_percent: -4.0,
-          total_trades: 18,
-          win_rate: 44.4,
-          max_drawdown: -12.1,
-          sharpe_ratio: -0.32,
-          status: 'completed',
-          created_at: '2024-02-01T14:15:00Z'
-        },
-        {
-          id: 3,
-          name: 'Multi-Asset Momentum',
-          strategy_name: 'Momentum Strategy',
-          symbol: 'SPY,QQQ,IWM',
-          start_date: '2023-01-01',
-          end_date: '2023-12-31',
-          initial_capital: 20000,
-          status: 'running',
-          created_at: '2024-02-15T09:00:00Z'
-        }
-      ]);
+      // Load user's backtests from the database
+      const response = await BacktestAPI.getBacktests();
+      setBacktests(response.backtests || []);
       
     } catch (error) {
       console.error('Failed to load backtests:', error);
@@ -149,7 +98,7 @@ const Backtests = () => {
           <div className="mt-4 sm:mt-0">
             <button
               onClick={handleCreateBacktest}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-800 text-sm font-medium rounded-md text-black bg-white hover:bg-gray-100 hover:border-gray-900 shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Backtest
@@ -166,7 +115,7 @@ const Backtests = () => {
             </p>
             <button
               onClick={handleCreateBacktest}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              className="inline-flex items-center px-6 py-3 border-2 border-gray-800 text-base font-medium rounded-md text-black bg-white hover:bg-gray-100 hover:border-gray-900 shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
             >
               <Plus className="h-5 w-5 mr-2" />
               Run Your First Backtest
@@ -198,7 +147,7 @@ const Backtests = () => {
                       </span>
                       <button
                         onClick={() => handleViewBacktest(backtest.id)}
-                        className="inline-flex items-center p-2 border border-transparent rounded-full shadow-sm text-white bg-primary-600 hover:bg-primary-700"
+                        className="inline-flex items-center p-2 border-2 border-gray-800 rounded-full shadow-lg text-black bg-white hover:bg-gray-100 hover:border-gray-900 transition-all duration-200 transform hover:scale-110 hover:shadow-xl"
                       >
                         <Eye className="h-4 w-4" />
                       </button>

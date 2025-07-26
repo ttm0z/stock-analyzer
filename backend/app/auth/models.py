@@ -5,40 +5,39 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from datetime import datetime, timedelta
 import jwt
 import os
-from ..models.base import Base, BaseModel
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, Text, ForeignKey
-from sqlalchemy.orm import relationship
+from ..models.base import BaseModel
+from ..db import db
 
 class User(BaseModel):
     """User model for authentication"""
     __tablename__ = 'users'
     
-    email = Column(String(255), unique=True, nullable=False, index=True)
-    username = Column(String(80), unique=True, nullable=False, index=True)
-    password_hash = Column(String(255), nullable=False)
+    email = db.Column(db.String(255), unique=True, nullable=False, index=True)
+    username = db.Column(db.String(80), unique=True, nullable=False, index=True)
+    password_hash = db.Column(db.String(255), nullable=False)
     
     # User status
-    is_active = Column(Boolean, default=True, nullable=False)
-    is_verified = Column(Boolean, default=False, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
+    is_verified = db.Column(db.Boolean, default=False, nullable=False)
     
     # Timestamps
-    last_login = Column(DateTime, nullable=True)
+    last_login = db.Column(db.DateTime, nullable=True)
     
     # Profile info
-    first_name = Column(String(50), nullable=True)
-    last_name = Column(String(50), nullable=True)
+    first_name = db.Column(db.String(50), nullable=True)
+    last_name = db.Column(db.String(50), nullable=True)
     
     # Preferences and settings (legacy JSON field)
-    preferences = Column(Text, nullable=True)  # Keep original column name
-    deactivated_at = Column(DateTime, nullable=True)
-    deactivation_reason = Column(Text, nullable=True)
+    preferences = db.Column(db.Text, nullable=True)  # Keep original column name
+    deactivated_at = db.Column(db.DateTime, nullable=True)
+    deactivation_reason = db.Column(db.Text, nullable=True)
     
     # Relationships - using string references to avoid circular imports
-    portfolios = relationship("Portfolio", back_populates="user", lazy='dynamic')
-    strategies = relationship("Strategy", back_populates="user", lazy='dynamic')
-    user_preferences = relationship("UserPreferences", back_populates="user", uselist=False)
-    risk_profiles = relationship("RiskProfile", back_populates="user", lazy='dynamic')
-    api_keys = relationship("APIKey", back_populates="user", lazy='dynamic')
+    portfolios = db.relationship("Portfolio", back_populates="user", lazy='dynamic')
+    strategies = db.relationship("Strategy", back_populates="user", lazy='dynamic')
+    user_preferences = db.relationship("UserPreferences", back_populates="user", uselist=False)
+    risk_profiles = db.relationship("RiskProfile", back_populates="user", lazy='dynamic')
+    api_keys = db.relationship("APIKey", back_populates="user", lazy='dynamic')
     
     def __init__(self, email, username, password, first_name=None, last_name=None):
         self.email = email.lower().strip()
@@ -96,7 +95,7 @@ class User(BaseModel):
                 os.getenv('JWT_SECRET_KEY'),
                 algorithms=['HS256']
             )
-            return session.query(User).get(payload['user_id'])
+            return User.query.get(payload['user_id'])
         except (jwt.ExpiredSignatureError, jwt.InvalidTokenError):
             return None
     
@@ -126,22 +125,22 @@ class APIKey(BaseModel):
     """API Key model for API access"""
     __tablename__ = 'api_keys'
     
-    user_id = Column(Integer, ForeignKey('users.id'), nullable=False)
-    key_hash = Column(String(255), nullable=False, unique=True)
-    name = Column(String(100), nullable=False)
+    user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    key_hash = db.Column(db.String(255), nullable=False, unique=True)
+    name = db.Column(db.String(100), nullable=False)
     
     # Key status
-    is_active = Column(Boolean, default=True, nullable=False)
+    is_active = db.Column(db.Boolean, default=True, nullable=False)
     
     # Timestamps
-    last_used = Column(DateTime, nullable=True)
-    expires_at = Column(DateTime, nullable=True)
+    last_used = db.Column(db.DateTime, nullable=True)
+    expires_at = db.Column(db.DateTime, nullable=True)
     
     # Usage tracking
-    usage_count = Column(Integer, default=0, nullable=False)
+    usage_count = db.Column(db.Integer, default=0, nullable=False)
     
     # Relationships
-    user = relationship('User', back_populates='api_keys')
+    user = db.relationship('User', back_populates='api_keys')
     
     def __init__(self, user_id, raw_key, name, expires_at=None):
         self.user_id = user_id

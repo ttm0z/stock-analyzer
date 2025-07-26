@@ -68,6 +68,9 @@ ipython_config.py
 celerybeat-schedule
 celerybeat.pid
 
+# Alembic
+alembic.ini
+
 # Logs
 *.log
 logs/

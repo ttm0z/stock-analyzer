@@ -203,6 +203,200 @@ class StrategyAPI {
       potential_investment: buySignals.reduce((sum, s) => sum + (s.quantity * s.price), 0)
     };
   }
+
+  // User Strategy Management CRUD Operations
+
+  // Get user's created strategies
+  static async getUserStrategies() {
+    try {
+      const response = await httpClient.get('/strategies/user');
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Get user strategies error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Create a new user strategy
+  static async createUserStrategy(strategyData) {
+    try {
+      const sanitizedData = {
+        name: sanitizeInput(strategyData.name),
+        description: sanitizeInput(strategyData.description || ''),
+        strategy_type: sanitizeInput(strategyData.strategy_type),
+        parameters: strategyData.parameters || {},
+        category: sanitizeInput(strategyData.category || 'equity'),
+        complexity: sanitizeInput(strategyData.complexity || 'intermediate'),
+        entry_rules: strategyData.entry_rules || {},
+        exit_rules: strategyData.exit_rules || {},
+        risk_rules: strategyData.risk_rules || {},
+        is_active: strategyData.is_active !== false,
+        tags: strategyData.tags || []
+      };
+
+      // Validation
+      if (!sanitizedData.name || sanitizedData.name.length < 3) {
+        throw new Error('Strategy name must be at least 3 characters long');
+      }
+
+      if (!sanitizedData.strategy_type) {
+        throw new Error('Strategy type is required');
+      }
+
+      const validTypes = ['moving_average', 'momentum', 'buy_hold'];
+      if (!validTypes.includes(sanitizedData.strategy_type)) {
+        throw new Error('Invalid strategy type');
+      }
+
+      const response = await httpClient.post('/strategies/user', sanitizedData);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Create user strategy error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Update user strategy
+  static async updateUserStrategy(strategyId, updateData) {
+    try {
+      const sanitizedData = {};
+      
+      if (updateData.name) {
+        sanitizedData.name = sanitizeInput(updateData.name);
+      }
+      if (updateData.description !== undefined) {
+        sanitizedData.description = sanitizeInput(updateData.description);
+      }
+      if (updateData.parameters) {
+        sanitizedData.parameters = updateData.parameters;
+      }
+      if (updateData.status) {
+        sanitizedData.status = updateData.status;
+      }
+      if (updateData.is_active !== undefined) {
+        sanitizedData.is_active = updateData.is_active;
+      }
+
+      const response = await httpClient.put(`/strategies/user/${strategyId}`, sanitizedData);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Update user strategy error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Delete user strategy
+  static async deleteUserStrategy(strategyId) {
+    try {
+      const response = await httpClient.delete(`/strategies/user/${strategyId}`);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Delete user strategy error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Execute user strategy
+  static async executeUserStrategy(strategyId, executionData) {
+    try {
+      const sanitizedData = {
+        universe: executionData.universe.map(symbol => symbol.trim().toUpperCase()),
+        portfolio_id: executionData.portfolio_id ? parseInt(executionData.portfolio_id) : undefined
+      };
+
+      // Validation
+      if (!Array.isArray(sanitizedData.universe) || sanitizedData.universe.length === 0) {
+        throw new Error('Universe must be a non-empty array of stock symbols');
+      }
+
+      // Validate all symbols
+      for (const symbol of sanitizedData.universe) {
+        if (!isValidSymbol(symbol)) {
+          throw new Error(`Invalid symbol: ${symbol}`);
+        }
+      }
+
+      // Remove undefined values
+      Object.keys(sanitizedData).forEach(key => {
+        if (sanitizedData[key] === undefined) {
+          delete sanitizedData[key];
+        }
+      });
+
+      const response = await httpClient.post(`/strategies/user/${strategyId}/execute`, sanitizedData);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Execute user strategy error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Get user strategy performance
+  static async getUserStrategyPerformance(strategyId) {
+    try {
+      const response = await httpClient.get(`/strategies/user/${strategyId}/performance`);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Get user strategy performance error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Get strategy templates
+  static async getStrategyTemplates() {
+    try {
+      const response = await httpClient.get('/strategies/templates');
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Get strategy templates error:', error);
+      }
+      throw error;
+    }
+  }
+
+  // Create strategy from template
+  static async createStrategyFromTemplate(templateId, strategyData) {
+    try {
+      const sanitizedData = {
+        name: sanitizeInput(strategyData.name),
+        description: sanitizeInput(strategyData.description || ''),
+        parameters: strategyData.parameters || {},
+        category: sanitizeInput(strategyData.category || 'equity'),
+        complexity: sanitizeInput(strategyData.complexity || 'intermediate'),
+        entry_rules: strategyData.entry_rules || {},
+        exit_rules: strategyData.exit_rules || {},
+        risk_rules: strategyData.risk_rules || {},
+        is_active: strategyData.is_active !== false,
+        tags: strategyData.tags || []
+      };
+
+      // Validation
+      if (!sanitizedData.name || sanitizedData.name.length < 3) {
+        throw new Error('Strategy name must be at least 3 characters long');
+      }
+
+      const response = await httpClient.post(`/strategies/from-template/${templateId}`, sanitizedData);
+      return response.data;
+    } catch (error) {
+      if (config.isDevelopment) {
+        console.error('Create strategy from template error:', error);
+      }
+      throw error;
+    }
+  }
 }
 
 export default StrategyAPI;

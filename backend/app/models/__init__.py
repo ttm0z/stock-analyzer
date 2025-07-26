@@ -5,10 +5,10 @@ This module contains all SQLAlchemy models for the backtesting system,
 organized by functional area.
 """
 
-from .base import Base, BaseModel, TimestampMixin
+from .base import BaseModel, TimestampMixin
 
 # User and authentication models - import from auth module
-from ..auth.models import User, APIKey as ApiKey
+# Note: User and APIKey are imported directly from auth.models where needed to avoid circular imports
 from .user_models import (
     UserSession, UserPreferences
 )
@@ -43,10 +43,10 @@ from .risk_models import (
 # All models for easy import
 __all__ = [
     # Base
-    'Base', 'BaseModel', 'TimestampMixin',
+    'BaseModel', 'TimestampMixin',
     
-    # User models
-    'User', 'ApiKey', 'UserSession', 'UserPreferences',
+    # User models (User and APIKey imported separately from auth.models)
+    'UserSession', 'UserPreferences',
     
     # Market data models
     'Asset', 'MarketData', 'MarketDataAdjustment', 'DataSource',
@@ -68,7 +68,7 @@ __all__ = [
 ]
 
 # Model groups for convenience
-USER_MODELS = [User, ApiKey, UserSession, UserPreferences]
+USER_MODELS = [UserSession, UserPreferences]  # User and APIKey imported separately from auth.models
 MARKET_DATA_MODELS = [Asset, MarketData, MarketDataAdjustment, DataSource, DataQuality, MarketCalendar, Benchmark]
 STRATEGY_MODELS = [Strategy, StrategyParameter, StrategyTemplate, StrategyLibrary, StrategyValidation, StrategyPerformance]
 BACKTEST_MODELS = [Backtest, BacktestPerformance, Trade, Signal, BacktestLog, BacktestComparison]

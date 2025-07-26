@@ -2,7 +2,7 @@ from flask.cli import with_appcontext
 import click
 from flask import current_app
 from sqlalchemy import create_engine
-from .models.base import Base
+from .db import db
 
 def register_cli_commands(app):
 
@@ -12,7 +12,7 @@ def register_cli_commands(app):
         """Initialize the database."""
         database_url = current_app.config.get('DATABASE_URL', 'postgresql://user:pass@localhost:5432/stockdb')
         engine = create_engine(database_url)
-        Base.metadata.create_all(engine)
+        db.metadata.create_all(engine)
         click.echo("✅ Initialized the database.")
 
     @app.cli.command("drop-db")
@@ -21,5 +21,5 @@ def register_cli_commands(app):
         """Drop all tables."""
         database_url = current_app.config.get('DATABASE_URL', 'postgresql://user:pass@localhost:5432/stockdb')
         engine = create_engine(database_url)
-        Base.metadata.drop_all(engine)
+        db.metadata.drop_all(engine)
         click.echo("🗑 Dropped the database.")

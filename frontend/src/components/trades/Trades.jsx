@@ -134,14 +134,14 @@ const Trades = () => {
           <div className="mt-4 sm:mt-0 flex space-x-3">
             <button
               onClick={() => {/* TODO: Implement export */}}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-500 text-sm font-medium rounded-md text-gray-800 bg-gray-100 hover:bg-gray-200 hover:border-gray-600 shadow-md transition-all duration-200 transform hover:scale-105"
             >
               <Download className="h-4 w-4 mr-2" />
               Export
             </button>
             <button
               onClick={handleNewTrade}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-800 text-sm font-medium rounded-md text-black bg-white hover:bg-gray-100 hover:border-gray-900 shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
             >
               <Plus className="h-4 w-4 mr-2" />
               New Trade
@@ -193,7 +193,7 @@ const Trades = () => {
                   setSelectedPortfolio('all');
                   setFilterType('all');
                 }}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="inline-flex items-center px-4 py-2 border-2 border-gray-500 text-sm font-medium rounded-md text-gray-800 bg-gray-100 hover:bg-gray-200 hover:border-gray-600 shadow-md transition-all duration-200 transform hover:scale-105"
               >
                 Clear Filters
               </button>

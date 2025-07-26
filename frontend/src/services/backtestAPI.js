@@ -84,7 +84,7 @@ class BacktestAPI {
           delete sanitizedData[key];
         }
       });
-
+      console.log(sanitizedData)
       const response = await httpClient.post('/backtests', sanitizedData);
       return response.data;
     } catch (error) {

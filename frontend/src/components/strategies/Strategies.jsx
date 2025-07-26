@@ -33,33 +33,9 @@ const Strategies = () => {
       setLoading(true);
       setError(null);
       
-      // TODO: Implement actual API call when strategy service is ready
-      // const response = await StrategyAPI.getStrategies();
-      // setStrategies(response.strategies || []);
-      
-      // Mock data for now
-      setStrategies([
-        {
-          id: 1,
-          name: 'Moving Average Crossover',
-          description: 'Buy when short MA crosses above long MA, sell when it crosses below',
-          status: 'active',
-          return_percent: 12.5,
-          total_trades: 24,
-          win_rate: 65.2,
-          created_at: '2024-01-15T10:30:00Z'
-        },
-        {
-          id: 2,
-          name: 'RSI Reversal',
-          description: 'Buy when RSI is oversold (<30), sell when overbought (>70)',
-          status: 'paused',
-          return_percent: -3.2,
-          total_trades: 18,
-          win_rate: 44.4,
-          created_at: '2024-02-01T14:15:00Z'
-        }
-      ]);
+      // Load user's created strategies from the database
+      const response = await StrategyAPI.getUserStrategies();
+      setStrategies(response.strategies || []);
       
     } catch (error) {
       console.error('Failed to load strategies:', error);
@@ -79,19 +55,21 @@ const Strategies = () => {
 
   const handleToggleStrategy = async (strategyId, currentStatus) => {
     try {
-      // TODO: Implement actual API call
-      // await StrategyAPI.updateStrategy(strategyId, { 
-      //   status: currentStatus === 'active' ? 'paused' : 'active' 
-      // });
+      // Update strategy status via API
+      const newStatus = currentStatus === 'active' ? 'paused' : 'active';
+      await StrategyAPI.updateUserStrategy(strategyId, { 
+        status: newStatus 
+      });
       
       // Update local state
       setStrategies(strategies.map(strategy => 
         strategy.id === strategyId 
-          ? { ...strategy, status: currentStatus === 'active' ? 'paused' : 'active' }
+          ? { ...strategy, status: newStatus }
           : strategy
       ));
     } catch (error) {
       console.error('Failed to toggle strategy:', error);
+      setError('Failed to update strategy. Please try again.');
     }
   };
 
@@ -139,7 +117,7 @@ const Strategies = () => {
           <div className="mt-4 sm:mt-0">
             <button
               onClick={handleCreateStrategy}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-800 text-sm font-medium rounded-md text-black bg-white hover:bg-gray-100 hover:border-gray-900 shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
             >
               <Plus className="h-4 w-4 mr-2" />
               Create Strategy
@@ -156,7 +134,7 @@ const Strategies = () => {
             </p>
             <button
               onClick={handleCreateStrategy}
-              className="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-primary-600 hover:bg-primary-700"
+              className="inline-flex items-center px-6 py-3 border-2 border-gray-800 text-base font-medium rounded-md text-black bg-white hover:bg-gray-100 hover:border-gray-900 shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
             >
               <Plus className="h-5 w-5 mr-2" />
               Create Your First Strategy
@@ -210,10 +188,10 @@ const Strategies = () => {
                   <div className="flex space-x-2">
                     <button
                       onClick={() => handleToggleStrategy(strategy.id, strategy.status)}
-                      className={`flex-1 inline-flex justify-center items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md ${
+                      className={`flex-1 inline-flex justify-center items-center px-3 py-2 border-2 text-sm font-medium rounded-md shadow-sm transition-all duration-200 transform hover:scale-105 ${
                         strategy.status === 'active'
-                          ? 'text-yellow-700 bg-yellow-100 hover:bg-yellow-200'
-                          : 'text-green-700 bg-green-100 hover:bg-green-200'
+                          ? 'text-yellow-800 bg-yellow-50 border-yellow-300 hover:bg-yellow-100 hover:border-yellow-400 hover:shadow-md'
+                          : 'text-green-800 bg-green-50 border-green-300 hover:bg-green-100 hover:border-green-400 hover:shadow-md'
                       }`}
                     >
                       {strategy.status === 'active' ? (
@@ -231,7 +209,7 @@ const Strategies = () => {
                     
                     <button
                       onClick={() => handleViewStrategy(strategy.id)}
-                      className="flex-1 inline-flex justify-center items-center px-3 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                      className="flex-1 inline-flex justify-center items-center px-3 py-2 border-2 border-gray-400 text-sm font-medium rounded-md text-gray-800 bg-gray-50 hover:bg-gray-100 hover:border-gray-500 shadow-sm transition-all duration-200 transform hover:scale-105 hover:shadow-md"
                     >
                       <Eye className="h-4 w-4 mr-1" />
                       View

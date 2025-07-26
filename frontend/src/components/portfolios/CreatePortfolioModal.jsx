@@ -77,7 +77,7 @@ const CreatePortfolioModal = ({ isOpen, onClose, onPortfolioCreated }) => {
           <div className="absolute top-4 right-4">
             <button
               type="button"
-              className="text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-1"
+              className="text-gray-600 bg-gray-100 border-2 border-gray-300 hover:text-gray-800 hover:bg-gray-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-md p-2 transition-all duration-200 transform hover:scale-105"
               onClick={onClose}
             >
               <span className="sr-only">Close</span>
@@ -207,14 +207,14 @@ const CreatePortfolioModal = ({ isOpen, onClose, onPortfolioCreated }) => {
                   <button
                     type="button"
                     onClick={onClose}
-                    className="w-full sm:w-auto px-4 py-3 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                    className="w-full sm:w-auto px-4 py-3 border-2 border-gray-500 rounded-md text-sm font-medium text-gray-800 bg-gray-100 hover:bg-gray-200 hover:border-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 shadow-md transition-all duration-200 transform hover:scale-105"
                   >
                     Cancel
                   </button>
                   <button
                     type="submit"
                     disabled={loading}
-                    className="w-full sm:w-auto px-4 py-3 border border-transparent rounded-md text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="w-full sm:w-auto px-4 py-3 border-2 border-gray-800 rounded-md text-sm font-medium text-black bg-white hover:bg-gray-100 hover:border-gray-900 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-500 disabled:opacity-60 disabled:cursor-not-allowed shadow-lg transition-all duration-200 transform hover:scale-105 hover:shadow-xl"
                   >
                     {loading ? 'Creating...' : 'Create Portfolio'}
                   </button>

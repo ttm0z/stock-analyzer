@@ -249,7 +249,7 @@ const Portfolios = () => {
             </p>
             <button
               onClick={() => setFilters({ portfolio_type: 'all', is_active: 'all', search: '' })}
-              className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+              className="inline-flex items-center px-4 py-2 border-2 border-gray-500 text-sm font-medium rounded-md text-gray-800 bg-gray-100 hover:bg-gray-200 hover:border-gray-600 shadow-md transition-all duration-200 transform hover:scale-105"
             >
               Clear Filters
             </button>
@@ -297,7 +297,7 @@ const Portfolios = () => {
                     <div className="relative">
                       <button
                         onClick={() => toggleActionMenu(portfolio.id)}
-                        className="p-1 text-gray-400 hover:text-gray-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 rounded"
+                        className="p-2 text-gray-600 bg-gray-100 border-2 border-gray-300 hover:text-gray-800 hover:bg-gray-200 hover:border-gray-400 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 rounded-lg shadow-sm transition-all duration-200"
                       >
                         <MoreVertical className="h-4 w-4" />
                       </button>

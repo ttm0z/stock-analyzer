@@ -5,7 +5,7 @@ from flask import Blueprint, request, jsonify, current_app, g
 from ..models.portfolio_models import Portfolio, Position, Transaction
 from ..auth.decorators import token_required
 from ..utils.validation import InputValidator, ValidationError, handle_validation_error
-from ..database import get_db_session
+from ..db import db
 import logging
 from datetime import datetime
 from decimal import Decimal
@@ -59,8 +59,7 @@ def execute_trade():
             return jsonify({'error': f'Invalid symbol: {symbol}'}), 400
         
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id,
             user_id=g.current_user.id,
             is_active=True
@@ -116,7 +115,7 @@ def execute_trade():
         
         # For SELL orders, check if user has enough shares
         if side == 'SELL':
-            existing_position = session.query(Position).filter_by(
+            existing_position = Position.query.filter_by(
                 portfolio_id=portfolio_id,
                 symbol=validated_symbol,
                 is_open=True
@@ -142,75 +141,80 @@ def execute_trade():
             status='FILLED'
         )
         
-        session.add(transaction)
+        try:
+            db.session.add(transaction)
         
-        # Update portfolio cash balance
-        if side == 'BUY':
-            portfolio.cash_balance -= total_cost
-        else:  # SELL
-            portfolio.cash_balance += (trade_value - commission)
-        
-        # Update or create position
-        position = session.query(Position).filter_by(
-            portfolio_id=portfolio_id,
-            symbol=validated_symbol,
-            is_open=True
-        ).first()
-        
-        if not position:
-            # Create new position for BUY orders
+            # Update portfolio cash balance
             if side == 'BUY':
-                position = Position(
-                    portfolio_id=portfolio_id,
-                    symbol=validated_symbol,
-                    side='LONG',
-                    quantity=quantity,
-                    avg_entry_price=execution_price,
-                    cost_basis=trade_value,
-                    current_price=current_price,
-                    market_value=quantity * current_price,
-                    unrealized_pnl=(current_price - execution_price) * quantity,
-                    first_entry_date=datetime.utcnow(),
-                    last_update_date=datetime.utcnow(),
-                    is_open=True
-                )
-                session.add(position)
-        else:
-            # Update existing position
-            if side == 'BUY':
-                # Add to existing position
-                new_total_cost = position.cost_basis + trade_value
-                new_quantity = position.quantity + quantity
-                position.avg_entry_price = new_total_cost / new_quantity
-                position.quantity = new_quantity
-                position.cost_basis = new_total_cost
+                portfolio.cash_balance -= total_cost
             else:  # SELL
-                # Reduce position
-                position.quantity -= quantity
-                
-                # Calculate realized P&L
-                realized_pnl = (execution_price - position.avg_entry_price) * quantity
-                position.realized_pnl = (position.realized_pnl or 0) + realized_pnl
-                portfolio.realized_pnl += realized_pnl
-                
-                # If position is fully closed, mark as closed
-                if position.quantity <= 0:
-                    position.is_open = False
-                else:
-                    # Update cost basis for remaining shares
-                    position.cost_basis = position.avg_entry_price * position.quantity
+                portfolio.cash_balance += (trade_value - commission)
+        
+            # Update or create position
+            position = Position.query.filter_by(
+                portfolio_id=portfolio_id,
+                symbol=validated_symbol,
+                is_open=True
+            ).first()
             
-            # Update current market values
-            position.current_price = current_price
-            position.market_value = position.quantity * current_price if position.is_open else 0
-            position.unrealized_pnl = (current_price - position.avg_entry_price) * position.quantity if position.is_open else 0
-            position.last_update_date = datetime.utcnow()
+            if not position:
+                # Create new position for BUY orders
+                if side == 'BUY':
+                    position = Position(
+                        portfolio_id=portfolio_id,
+                        symbol=validated_symbol,
+                        side='LONG',
+                        quantity=quantity,
+                        avg_entry_price=execution_price,
+                        cost_basis=trade_value,
+                        current_price=current_price,
+                        market_value=quantity * current_price,
+                        unrealized_pnl=(current_price - execution_price) * quantity,
+                        first_entry_date=datetime.utcnow(),
+                        last_update_date=datetime.utcnow(),
+                        is_open=True
+                    )
+                    db.session.add(position)
+            else:
+                # Update existing position
+                if side == 'BUY':
+                    # Add to existing position
+                    new_total_cost = position.cost_basis + trade_value
+                    new_quantity = position.quantity + quantity
+                    position.avg_entry_price = new_total_cost / new_quantity
+                    position.quantity = new_quantity
+                    position.cost_basis = new_total_cost
+                else:  # SELL
+                    # Reduce position
+                    position.quantity -= quantity
+                    
+                    # Calculate realized P&L
+                    realized_pnl = (execution_price - position.avg_entry_price) * quantity
+                    position.realized_pnl = (position.realized_pnl or 0) + realized_pnl
+                    portfolio.realized_pnl += realized_pnl
+                    
+                    # If position is fully closed, mark as closed
+                    if position.quantity <= 0:
+                        position.is_open = False
+                    else:
+                        # Update cost basis for remaining shares
+                        position.cost_basis = position.avg_entry_price * position.quantity
+                
+                # Update current market values
+                position.current_price = current_price
+                position.market_value = position.quantity * current_price if position.is_open else 0
+                position.unrealized_pnl = (current_price - position.avg_entry_price) * position.quantity if position.is_open else 0
+                position.last_update_date = datetime.utcnow()
         
-        # Update portfolio totals
-        portfolio.calculate_portfolio_value()
-        portfolio.last_updated = datetime.utcnow()
+            # Update portfolio totals
+            portfolio.calculate_portfolio_value()
+            portfolio.last_updated = datetime.utcnow()
         
-        session.commit()
+            db.session.commit()
+        except Exception as db_error:
+            db.session.rollback()
+            logger.error(f"Database error during trade execution: {db_error}")
+            return jsonify({'error': 'Failed to execute trade'}), 500
         
         logger.info(f"Trade executed: {side} {quantity} {validated_symbol} @ ${execution_price:.2f} for user {g.current_user.id}")
         
@@ -236,6 +240,7 @@ def execute_trade():
         }), 201
         
     except Exception as e:
+        db.session.rollback()
         logger.error(f"Trade execution error: {e}")
         return jsonify({'error': 'Failed to execute trade'}), 500
 
@@ -248,8 +253,7 @@ def get_portfolio_transactions(portfolio_id):
     
     try:
         # Verify portfolio ownership
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()
@@ -263,9 +267,8 @@ def get_portfolio_transactions(portfolio_id):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query using session
-        session = get_db_session()
-        query = session.query(Transaction).filter_by(portfolio_id=portfolio_id)
+        # Build query
+        query = Transaction.query.filter_by(portfolio_id=portfolio_id)
         
         if symbol:
             query = query.filter(Transaction.symbol == symbol.upper())
@@ -316,8 +319,7 @@ def get_portfolio_orders(portfolio_id):
     
     try:
         # Verify portfolio ownership
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()
@@ -330,9 +332,8 @@ def get_portfolio_orders(portfolio_id):
         limit = request.args.get('limit', 50, type=int)
         offset = request.args.get('offset', 0, type=int)
         
-        # Build query using session
-        session = get_db_session()
-        query = session.query(Transaction).filter_by(portfolio_id=portfolio_id)
+        # Build query
+        query = Transaction.query.filter_by(portfolio_id=portfolio_id)
         
         if status:
             query = query.filter(Transaction.status == status.upper())
@@ -430,8 +431,7 @@ def get_buying_power(portfolio_id):
     
     try:
         # Find portfolio
-        session = get_db_session()
-        portfolio = session.query(Portfolio).filter_by(
+        portfolio = Portfolio.query.filter_by(
             id=portfolio_id,
             user_id=g.current_user.id
         ).first()

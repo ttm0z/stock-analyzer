@@ -396,7 +396,7 @@ const MarketOverview = () => {
               
               <button
                 onClick={() => loadMarketData()}
-                className="inline-flex items-center px-3 py-2 border border-gray-300 shadow-sm text-sm leading-4 font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="inline-flex items-center px-3 py-2 border-2 border-gray-500 shadow-md text-sm leading-4 font-medium rounded-md text-gray-800 bg-gray-100 hover:bg-gray-200 hover:border-gray-600 transition-all duration-200 transform hover:scale-105"
               >
                 <RefreshCw className="h-4 w-4 mr-2" />
                 Refresh
